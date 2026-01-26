@@ -28,6 +28,15 @@ export interface Business {
   reviewCount: number;
 }
 
+export interface Comment {
+  id: string;
+  postId: string;
+  userId: string;
+  userEmail: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface MediaPost {
   id: string;
   businessId: string;
@@ -41,6 +50,7 @@ export interface MediaPost {
   likes: number;
   isAffiliate: boolean;
   business?: Business;
+  commentsCount?: number;
 }
 
-export type ViewState = 'feed' | 'discovery' | 'profile' | 'dashboard' | 'me' | 'record';
+export type ViewState = 'feed' | 'discovery' | 'profile' | 'following' | 'me' | 'record' | 'dashboard';

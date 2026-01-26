@@ -4,7 +4,7 @@ import { supabase } from './lib/supabase';
 import { 
   Home, 
   Search, 
-  LayoutDashboard, 
+  Users, 
   User, 
   PlusSquare,
   LogIn
@@ -18,6 +18,7 @@ import DashboardView from './components/DashboardView';
 import MeView from './components/MeView';
 import RecordView from './components/RecordView';
 import AuthView from './components/AuthView';
+import FollowingView from './components/FollowingView';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -28,7 +29,6 @@ const App: React.FC = () => {
   const [allPosts, setAllPosts] = useState<MediaPost[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Sistema de Tema
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('bizstream-theme');
     return (saved as 'light' | 'dark') || 'dark';
@@ -160,7 +160,7 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (!session && (activeTab === 'me' || activeTab === 'dashboard' || activeTab === 'record')) {
+    if (!session && (activeTab === 'me' || activeTab === 'following' || activeTab === 'record' || activeTab === 'dashboard')) {
       return <AuthView onBack={() => setActiveTab('feed')} />;
     }
     switch (activeTab) {
@@ -168,6 +168,8 @@ const App: React.FC = () => {
         return <FeedView posts={allPosts} onProfileClick={navigateToProfile} />;
       case 'discovery':
         return <DiscoveryView onBusinessClick={navigateToProfile} />;
+      case 'following':
+        return <FollowingView onProfileClick={navigateToProfile} />;
       case 'profile':
         return (
           <ProfileView 
@@ -177,7 +179,12 @@ const App: React.FC = () => {
           />
         );
       case 'dashboard':
-        return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => (p.businessId === userBusiness?.id || p.business?.id === userBusiness?.id))} />;
+        return (
+          <div className="h-full bg-white dark:bg-black overflow-y-auto">
+            <button onClick={() => setActiveTab('me')} className="m-6 p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900 text-[10px] font-black uppercase tracking-widest text-zinc-900 dark:text-white">Voltar ao Perfil</button>
+            <DashboardView business={userBusiness} userPosts={allPosts.filter(p => (p.businessId === userBusiness?.id || p.business?.id === userBusiness?.id))} />
+          </div>
+        );
       case 'me':
         return (
           <MeView 
@@ -186,6 +193,7 @@ const App: React.FC = () => {
             onUpdateBusiness={handleUpdateBusiness}
             theme={theme}
             onToggleTheme={(t) => setTheme(t)}
+            onOpenDashboard={() => setActiveTab('dashboard')}
           />
         );
       case 'record':
@@ -195,42 +203,42 @@ const App: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-zinc-950 text-white font-bold tracking-widest animate-pulse uppercase">BizStream</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center bg-black text-white font-black tracking-[0.4em] animate-pulse uppercase">BizStream</div>;
 
   return (
-    <div className={`mobile-frame transition-colors duration-500 ${theme === 'dark' ? 'dark bg-black' : 'bg-zinc-50'} flex flex-col h-screen overflow-hidden`}>
+    <div className={`mobile-frame transition-colors duration-500 ${theme === 'dark' ? 'dark bg-black text-white' : 'bg-white text-zinc-950'} flex flex-col h-screen overflow-hidden`}>
       <main className="flex-1 overflow-y-auto hide-scrollbar relative">
         {renderContent()}
       </main>
 
       {activeTab !== 'record' && (
-        <nav className="h-[84px] border-t border-zinc-100 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-2xl flex items-center justify-around px-6 z-50">
-          <NavButton active={activeTab === 'feed'} icon={<Home size={22} />} label="Início" onClick={() => changeTab('feed')} />
-          <NavButton active={activeTab === 'discovery'} icon={<Search size={22} />} label="Explorar" onClick={() => changeTab('discovery')} />
+        <nav className={`h-[84px] border-t transition-colors duration-500 ${theme === 'dark' ? 'border-zinc-900 bg-black' : 'border-zinc-100 bg-white'} flex items-center justify-around px-6 z-50`}>
+          <NavButton active={activeTab === 'feed'} icon={<Home size={24} />} label="Feed" onClick={() => changeTab('feed')} theme={theme} />
+          <NavButton active={activeTab === 'discovery'} icon={<Search size={24} />} label="Buscar" onClick={() => changeTab('discovery')} theme={theme} />
           
           <div className="flex flex-col items-center justify-center">
             <div 
               onClick={() => changeTab('record')} 
-              className="w-[60px] h-[52px] rounded-[1.4rem] bg-blue-600 flex items-center justify-center text-white shadow-[0_8px_25px_rgb(37,99,235,0.4)] active:scale-95 transition-all cursor-pointer border-2 border-white/10"
+              className={`w-[58px] h-[58px] rounded-[1.6rem] bg-blue-600 flex items-center justify-center text-white shadow-[0_8px_30px_rgb(37,99,235,0.3)] active:scale-90 transition-all cursor-pointer`}
             >
-              <PlusSquare size={26} />
+              <PlusSquare size={28} />
             </div>
           </div>
 
-          <NavButton active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22} />} label="Painel" onClick={() => changeTab('dashboard')} />
-          <NavButton active={activeTab === 'me'} icon={session ? <User size={22} /> : <LogIn size={22} />} label={session ? "Perfil" : "Entrar"} onClick={() => changeTab('me')} />
+          <NavButton active={activeTab === 'following'} icon={<Users size={24} />} label="Rede" onClick={() => changeTab('following')} theme={theme} />
+          <NavButton active={activeTab === 'me'} icon={session ? <User size={24} /> : <LogIn size={24} />} label={session ? "Eu" : "Entrar"} onClick={() => changeTab('me')} theme={theme} />
         </nav>
       )}
     </div>
   );
 };
 
-const NavButton: React.FC<{ active: boolean; icon: React.ReactNode; label: string; onClick: () => void }> = ({ active, icon, label, onClick }) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center space-y-1 w-16 transition-all ${active ? 'text-blue-600' : 'text-zinc-500'}`}>
-    <div className={`transition-transform duration-300 ${active ? 'scale-110 -translate-y-0.5' : ''}`}>
+const NavButton: React.FC<{ active: boolean; icon: React.ReactNode; label: string; onClick: () => void; theme: 'light' | 'dark' }> = ({ active, icon, label, onClick, theme }) => (
+  <button onClick={onClick} className={`flex flex-col items-center justify-center space-y-1.5 w-14 transition-all ${active ? 'text-blue-600' : theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
+    <div className={`transition-all duration-300 ${active ? 'scale-110 -translate-y-0.5' : ''}`}>
       {icon}
     </div>
-    <span className={`text-[9px] font-black uppercase tracking-tighter transition-colors ${active ? 'text-blue-600' : 'text-zinc-400'}`}>{label}</span>
+    <span className={`text-[8px] font-black uppercase tracking-[0.15em] transition-colors`}>{label}</span>
   </button>
 );
 

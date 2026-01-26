@@ -3,14 +3,9 @@ import React, { useState } from 'react';
 import { 
   BarChart, 
   Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  Cell
+  ResponsiveContainer
 } from 'recharts';
-import { Eye, MousePointer2, MessageSquare, Share2, PlusCircle, TrendingUp, Sparkles, Loader2, PlayCircle } from 'lucide-react';
+import { Eye, MousePointer2, TrendingUp, PlayCircle } from 'lucide-react';
 import { Business, MediaPost } from '../types';
 
 interface DashboardViewProps {
@@ -30,77 +25,73 @@ const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts }) =>
   const totalViews = userPosts.reduce((acc, p) => acc + (p.likes * 12), 0);
 
   return (
-    <div className="p-5 space-y-6 bg-white dark:bg-zinc-950 min-h-full pb-20">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">Business Hub</h1>
-          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">
-            {business?.name || "Configurando Perfil..."}
-          </p>
+    <div className="p-6 space-y-10 bg-white dark:bg-black transition-colors duration-500">
+      <div className="flex justify-between items-center px-2">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-black tracking-tighter text-zinc-950 dark:text-white uppercase">Painel</h1>
+          <p className="text-[10px] text-zinc-400 font-black uppercase tracking-[0.3em]">Gestão: {business?.name || "Global"}</p>
         </div>
-        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg">
-            <TrendingUp size={22} />
+        <div className="w-16 h-16 rounded-[2rem] bg-blue-600 flex items-center justify-center text-white shadow-2xl">
+            <TrendingUp size={30} />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <StatCard 
           active={activeMetric === 'views'}
           onClick={() => setActiveMetric('views')}
-          icon={<Eye className="text-blue-500" size={18} />} 
-          label="Visualizações" 
+          icon={<Eye className="text-blue-500" size={24} />} 
+          label="Alcance Total" 
           value={totalViews > 0 ? `${(totalViews/1000).toFixed(1)}k` : "0"} 
-          change="+100%" 
+          change="+12%" 
         />
         <StatCard 
           active={activeMetric === 'clicks'}
           onClick={() => setActiveMetric('clicks')}
-          icon={<MousePointer2 className="text-green-500" size={18} />} 
-          label="Publicações" 
+          icon={<MousePointer2 className="text-green-500" size={24} />} 
+          label="Posts Ativos" 
           value={userPosts.length.toString()} 
           change="Ativo" 
         />
       </div>
 
-      <div className="p-5 bg-zinc-50 dark:bg-zinc-900 rounded-3xl space-y-5 border border-zinc-100 dark:border-zinc-800 shadow-sm">
+      <div className="p-8 bg-zinc-50 dark:bg-zinc-950 rounded-[3rem] space-y-8 border border-zinc-100 dark:border-zinc-900 shadow-sm">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold">Desempenho Semanal</h3>
-          <div className="bg-blue-600/10 text-blue-600 px-2 py-1 rounded-full text-[10px] font-black uppercase">Live</div>
+          <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-zinc-400">Atividade Semanal</h3>
+          <div className="bg-blue-600/10 text-blue-600 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest">Real-time</div>
         </div>
-        <div className="h-40 w-full">
+        <div className="h-56 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={viewData}>
-              <Bar dataKey="val" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="val" fill="#2563eb" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <h3 className="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] px-1">Gerenciar Conteúdo</h3>
-        <div className="space-y-3">
-            {userPosts.length > 0 ? userPosts.map(post => (
-                <div key={post.id} className="flex items-center gap-3 p-3 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl shadow-sm">
-                    <div className="relative w-14 h-14 rounded-xl overflow-hidden">
+      <div className="space-y-6">
+        <h3 className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.5em] px-4">Inventário de Mídia</h3>
+        <div className="space-y-5">
+            {userPosts.map(post => (
+                <div key={post.id} className="flex items-center gap-6 p-6 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-900 rounded-[2.5rem] shadow-sm hover:scale-[1.01] transition-all">
+                    <div className="relative w-20 h-20 rounded-[1.8rem] overflow-hidden shadow-lg border-2 border-white dark:border-black">
                       <img src={post.thumbnail} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20"><PlayCircle className="text-white/70" size={18} /></div>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30"><PlayCircle className="text-white" size={24} /></div>
                     </div>
                     <div className="flex-1">
-                        <p className="text-xs font-bold line-clamp-1 text-zinc-800 dark:text-zinc-200">{post.caption}</p>
-                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-tighter">Alcance: {post.likes * 5}</span>
+                        <p className="text-sm font-black text-zinc-950 dark:text-white uppercase tracking-tight line-clamp-1">{post.caption}</p>
+                        <div className="flex items-center gap-4 mt-1">
+                           <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Visualizações: {post.likes * 5}</span>
+                        </div>
                     </div>
                     <button 
                       onClick={() => { setIsBoosting(post.id); setTimeout(() => setIsBoosting(null), 2000); }}
-                      className="text-[10px] font-black px-4 py-2 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/20"
+                      className="text-[10px] font-black px-6 py-4 rounded-[1.5rem] bg-blue-600 text-white active:scale-90 transition-all uppercase tracking-widest shadow-lg shadow-blue-500/10"
                     >
-                      {isBoosting === post.id ? '...' : 'IMPULSIONAR'}
+                      {isBoosting === post.id ? '...' : 'Boost'}
                     </button>
                 </div>
-            )) : (
-              <div className="text-center py-10 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl">
-                <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest">Nenhuma publicação</p>
-              </div>
-            )}
+            ))}
         </div>
       </div>
     </div>
@@ -108,14 +99,14 @@ const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts }) =>
 };
 
 const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string; change: string; active?: boolean; onClick?: () => void }> = ({ icon, label, value, change, active, onClick }) => (
-  <div onClick={onClick} className={`p-4 rounded-3xl space-y-1 transition-all cursor-pointer border-2 ${active ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'bg-zinc-50 dark:bg-zinc-900 border-transparent'}`}>
+  <div onClick={onClick} className={`p-8 rounded-[3rem] space-y-3 transition-all cursor-pointer border-2 ${active ? 'border-blue-600 bg-white dark:bg-black shadow-2xl' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-900 shadow-sm'}`}>
     <div className="flex items-center justify-between">
-      <div className="p-2 bg-white dark:bg-zinc-800 rounded-xl shadow-sm">{icon}</div>
-      <span className="text-[10px] font-bold text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">{change}</span>
+      <div className={`p-3 rounded-2xl shadow-sm bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800`}>{icon}</div>
+      <span className="text-[10px] font-black text-green-600 bg-green-500/10 px-3 py-1.5 rounded-full uppercase tracking-tighter">{change}</span>
     </div>
-    <div className="pt-3">
-      <div className="text-xl font-black tracking-tight">{value}</div>
-      <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{label}</div>
+    <div className="pt-2">
+      <div className="text-4xl font-black tracking-tighter text-zinc-950 dark:text-white">{value}</div>
+      <div className="text-[10px] text-zinc-400 font-black uppercase tracking-[0.3em]">{label}</div>
     </div>
   </div>
 );
