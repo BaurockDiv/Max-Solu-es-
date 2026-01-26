@@ -27,6 +27,21 @@ const App: React.FC = () => {
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [allPosts, setAllPosts] = useState<MediaPost[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Sistema de Tema
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('bizstream-theme');
+    return (saved as 'light' | 'dark') || 'dark';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('bizstream-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -70,7 +85,7 @@ const App: React.FC = () => {
           businessId: p.businessId || p.business_id,
           url: p.url || p.media_url,
           thumbnail: p.thumbnail || p.thumbnail_url,
-          business: p.business || { id: p.businessId || p.business_id, name: "Empresa Parceira", logo: 'https://picsum.photos/200/200' }
+          business: p.business || { id: p.businessId || p.business_id, name: "Meu Negócio", logo: 'https://picsum.photos/200/200' }
         }));
         setAllPosts(normalized as any);
       }
@@ -81,7 +96,6 @@ const App: React.FC = () => {
 
   const handleUpdateBusiness = (updatedBiz: Business) => {
     setUserBusiness(updatedBiz);
-    // Sincronização instantânea nos posts da memória
     setAllPosts(current => current.map(post => {
       if (post.businessId === updatedBiz.id || post.business?.id === updatedBiz.id) {
         return { ...post, business: updatedBiz };
@@ -92,28 +106,22 @@ const App: React.FC = () => {
 
   const handleNewPost = async (mediaBlob: Blob, type: 'video' | 'image', caption: string) => {
     if (!session) return;
-
     try {
       let bizId = userBusiness?.id;
       if (!bizId) {
         const { data: biz } = await supabase.from('businesses').select('id').eq('owner_id', session.user.id).single();
         bizId = biz?.id;
       }
-
       if (!bizId) {
         alert("Erro: Crie um perfil de negócio primeiro.");
         return;
       }
-
       const fileName = `${Date.now()}.${type === 'video' ? 'mp4' : 'jpg'}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('media')
         .upload(`${session.user.id}/${fileName}`, mediaBlob);
-
       if (uploadError) throw uploadError;
-
       const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(uploadData.path);
-
       const { error: dbError } = await supabase.from('posts').insert({
         business_id: bizId,
         type: type,
@@ -121,7 +129,6 @@ const App: React.FC = () => {
         caption: caption || "Publicação sem legenda",
         cta_text: "Saiba Mais"
       });
-
       if (!dbError) {
         await fetchData();
         setActiveTab('feed');
@@ -156,7 +163,6 @@ const App: React.FC = () => {
     if (!session && (activeTab === 'me' || activeTab === 'dashboard' || activeTab === 'record')) {
       return <AuthView onBack={() => setActiveTab('feed')} />;
     }
-
     switch (activeTab) {
       case 'feed':
         return <FeedView posts={allPosts} onProfileClick={navigateToProfile} />;
@@ -173,7 +179,15 @@ const App: React.FC = () => {
       case 'dashboard':
         return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => (p.businessId === userBusiness?.id || p.business?.id === userBusiness?.id))} />;
       case 'me':
-        return <MeView session={session} business={userBusiness} onUpdateBusiness={handleUpdateBusiness} />;
+        return (
+          <MeView 
+            session={session} 
+            business={userBusiness} 
+            onUpdateBusiness={handleUpdateBusiness}
+            theme={theme}
+            onToggleTheme={(t) => setTheme(t)}
+          />
+        );
       case 'record':
         return <RecordView onCancel={() => setActiveTab('feed')} onPost={handleNewPost} />;
       default:
@@ -181,33 +195,30 @@ const App: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-zinc-950 text-white font-bold tracking-widest animate-pulse uppercase">Carregando BizStream</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center bg-zinc-950 text-white font-bold tracking-widest animate-pulse uppercase">BizStream</div>;
 
   return (
-    <div className="mobile-frame bg-white dark:bg-zinc-950 flex flex-col h-screen overflow-hidden">
-      <main className="flex-1 overflow-y-auto hide-scrollbar relative bg-zinc-50 dark:bg-zinc-950">
+    <div className={`mobile-frame transition-colors duration-500 ${theme === 'dark' ? 'dark bg-black' : 'bg-zinc-50'} flex flex-col h-screen overflow-hidden`}>
+      <main className="flex-1 overflow-y-auto hide-scrollbar relative">
         {renderContent()}
       </main>
 
       {activeTab !== 'record' && (
-        <nav className="h-16 border-t border-zinc-100 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md flex items-center justify-around px-2 z-50">
+        <nav className="h-[84px] border-t border-zinc-100 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-2xl flex items-center justify-around px-6 z-50">
           <NavButton active={activeTab === 'feed'} icon={<Home size={22} />} label="Início" onClick={() => changeTab('feed')} />
           <NavButton active={activeTab === 'discovery'} icon={<Search size={22} />} label="Explorar" onClick={() => changeTab('discovery')} />
           
-          <div className="flex flex-col items-center justify-center p-2">
-            <div onClick={() => changeTab('record')} className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-95 transition-all cursor-pointer">
-              <PlusSquare size={24} />
+          <div className="flex flex-col items-center justify-center">
+            <div 
+              onClick={() => changeTab('record')} 
+              className="w-[60px] h-[52px] rounded-[1.4rem] bg-blue-600 flex items-center justify-center text-white shadow-[0_8px_25px_rgb(37,99,235,0.4)] active:scale-95 transition-all cursor-pointer border-2 border-white/10"
+            >
+              <PlusSquare size={26} />
             </div>
           </div>
 
           <NavButton active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22} />} label="Painel" onClick={() => changeTab('dashboard')} />
-          
-          <NavButton 
-            active={activeTab === 'me'} 
-            icon={session ? <User size={22} /> : <LogIn size={22} />} 
-            label={session ? "Perfil" : "Entrar"} 
-            onClick={() => changeTab('me')} 
-          />
+          <NavButton active={activeTab === 'me'} icon={session ? <User size={22} /> : <LogIn size={22} />} label={session ? "Perfil" : "Entrar"} onClick={() => changeTab('me')} />
         </nav>
       )}
     </div>
@@ -215,9 +226,11 @@ const App: React.FC = () => {
 };
 
 const NavButton: React.FC<{ active: boolean; icon: React.ReactNode; label: string; onClick: () => void }> = ({ active, icon, label, onClick }) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center space-y-0.5 w-16 transition-all ${active ? 'text-blue-600' : 'text-zinc-500'}`}>
-    {icon}
-    <span className="text-[10px] font-bold">{label}</span>
+  <button onClick={onClick} className={`flex flex-col items-center justify-center space-y-1 w-16 transition-all ${active ? 'text-blue-600' : 'text-zinc-500'}`}>
+    <div className={`transition-transform duration-300 ${active ? 'scale-110 -translate-y-0.5' : ''}`}>
+      {icon}
+    </div>
+    <span className={`text-[9px] font-black uppercase tracking-tighter transition-colors ${active ? 'text-blue-600' : 'text-zinc-400'}`}>{label}</span>
   </button>
 );
 
