@@ -6,27 +6,50 @@ export const MOCK_BUSINESSES: Record<string, Business> = {
     id: 'b1',
     name: 'Artisan Brews',
     logo: 'https://picsum.photos/id/10/200/200',
-    bio: 'Cafés de origem controlada e confeitaria artesanal no coração de SP.',
+    bio: 'Locally sourced coffee and hand-crafted pastries in the heart of the city.',
     category: Category.FOOD,
     verified: true,
-    location: 'Pinheiros, São Paulo',
-    hours: 'Seg - Sex, 08:00 - 18:00',
-    links: [{ title: 'Cardápio Digital', url: '#' }, { title: 'Instagram', url: '#' }],
-    contact: { whatsapp: '11999999999', email: 'hello@artisanbrews.com' },
+    location: '123 Main St, New York',
+    hours: '08:00 AM - 06:00 PM',
+    links: [
+      { title: 'Order Online', url: '#' },
+      { title: 'Instagram', url: '#' }
+    ],
+    contact: { whatsapp: '1234567890', email: 'hello@artisanbrews.com' },
     rating: 4.8,
     reviewCount: 124
   },
   'b2': {
     id: 'b2',
-    name: 'Skyline Lofts',
-    logo: 'https://picsum.photos/id/1016/200/200',
-    bio: 'Aluguéis de curta temporada em lofts industriais luxuosos.',
+    name: 'Swift Code Studio',
+    logo: 'https://picsum.photos/id/2/200/200',
+    bio: 'Premium mobile app development for startups and visionaries.',
+    category: Category.TECH,
+    verified: true,
+    location: 'Remote / SF',
+    hours: 'Mon-Fri 9-5',
+    links: [
+      { title: 'Portfolio', url: '#' },
+      { title: 'Hire Us', url: '#' }
+    ],
+    contact: { email: 'info@swiftcode.dev' },
+    rating: 5.0,
+    reviewCount: 45
+  },
+  'b3': {
+    id: 'b3',
+    name: 'Mountain Escape',
+    logo: 'https://picsum.photos/id/11/200/200',
+    bio: 'Modern tiny homes nestled in the woods for your next getaway.',
     category: Category.REAL_ESTATE,
     verified: true,
-    location: 'Vila Olímpia, SP',
-    hours: 'Diariamente, 24h',
-    links: [{ title: 'Airbnb', url: '#' }],
-    contact: { phone: '11988887777' },
+    location: 'Asheville, NC',
+    hours: '24/7 Booking',
+    links: [
+      { title: 'Airbnb Listing', url: '#' },
+      { title: 'Direct Booking', url: '#' }
+    ],
+    contact: { phone: '9876543210' },
     rating: 4.9,
     reviewCount: 230
   }
@@ -39,24 +62,37 @@ export const MOCK_POSTS: MediaPost[] = [
     type: 'video',
     url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
     thumbnail: 'https://picsum.photos/id/100/1080/1920',
-    caption: 'O aroma do café fresquinho passando agora! ☕ #coffee #artisan',
-    ctaText: 'Ver Cardápio',
+    caption: 'Fresh morning pour! ☕ Come experience the best beans in NYC.',
+    ctaText: 'View Menu',
     ctaUrl: '#',
-    tags: ['#coffee', '#sp', '#artisan'],
+    tags: ['#coffee', '#nyc', '#artisan'],
     likes: 1240,
     isAffiliate: false
   },
   {
     id: 'p2',
-    businessId: 'b2',
+    businessId: 'b3',
     type: 'image',
     url: 'https://picsum.photos/id/1016/1080/1920',
     thumbnail: 'https://picsum.photos/id/1016/1080/1920',
-    caption: 'Acordar com essa vista é o novo padrão de luxo. Reserve seu loft.',
-    ctaText: 'Reservar Agora',
+    caption: 'The view from our newest tiny home is absolutely breathtaking.',
+    ctaText: 'Book Now',
     ctaUrl: '#',
-    tags: ['#lifestyle', '#luxury', '#sp'],
+    tags: ['#travel', '#nature', '#tinyhome'],
     likes: 890,
     isAffiliate: false
+  },
+  {
+    id: 'p3',
+    businessId: 'b2',
+    type: 'image',
+    url: 'https://picsum.photos/id/101/1080/1920',
+    thumbnail: 'https://picsum.photos/id/101/1080/1920',
+    caption: 'Just launched! 🚀 Our new design system for client projects.',
+    ctaText: 'Free Consultation',
+    ctaUrl: '#',
+    tags: ['#development', '#uxui', '#startup'],
+    likes: 560,
+    isAffiliate: true
   }
 ];

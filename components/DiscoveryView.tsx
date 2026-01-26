@@ -24,23 +24,33 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
   }, [search, selectedCategory]);
 
   return (
-    <div className="flex flex-col min-h-full bg-white dark:bg-black p-6 space-y-8 transition-colors duration-500 overflow-y-auto pb-32">
+    <div className="flex flex-col min-h-full bg-white dark:bg-black p-6 space-y-8 transition-colors duration-500">
       <div className="space-y-5">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-white">Descoberta</h1>
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors" size={20} />
           <input 
             type="text" 
-            placeholder="Buscar empresas, serviços..."
+            placeholder="Buscar empresas, serviços, talentos..."
             className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-[1.5rem] py-5 pl-12 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all border-none placeholder:text-zinc-400 text-zinc-900 dark:text-white"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400">
+              <X size={18} />
+            </button>
+          )}
         </div>
       </div>
 
       <div className="space-y-5">
-        <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em] px-2">Categorias</h2>
+        <div className="flex items-center justify-between px-2">
+          <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em]">Categorias</h2>
+          {selectedCategory && (
+            <button onClick={() => setSelectedCategory(null)} className="text-blue-600 text-[10px] font-black uppercase tracking-widest">Limpar</button>
+          )}
+        </div>
         <div className="flex overflow-x-auto gap-4 hide-scrollbar pb-2">
           {categories.map((cat) => (
             <div 
@@ -57,23 +67,43 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
         </div>
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em] px-2">Empresas</h2>
-        <div className="space-y-4">
-          {filteredBusinesses.map((biz) => (
+      <div className="space-y-5">
+        <div className="flex items-center justify-between px-2">
+          <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-2">
+            <MapPin size={16} /> Próximo a você
+          </h2>
+          <button className="text-blue-600 text-[10px] font-black uppercase tracking-widest">São Paulo, BR</button>
+        </div>
+        
+        <div className="space-y-4 pb-28">
+          {filteredBusinesses.length > 0 ? filteredBusinesses.map((biz) => (
             <div 
               key={biz.id} 
               onClick={() => onBusinessClick(biz.id)}
               className="flex items-center p-4 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all cursor-pointer active:scale-[0.98] bg-white dark:bg-zinc-900 shadow-sm"
             >
               <img src={biz.logo} className="w-16 h-16 rounded-[1.4rem] object-cover shadow-md" alt={biz.name} />
-              <div className="ml-5 flex-1 overflow-hidden">
-                <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight truncate">{biz.name}</h3>
-                <p className="text-[11px] text-zinc-500 font-medium line-clamp-1">{biz.bio}</p>
+              <div className="ml-5 flex-1">
+                <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight">{biz.name}</h3>
+                <p className="text-[11px] text-zinc-500 font-medium line-clamp-1 mb-1">{biz.bio}</p>
+                <div className="flex items-center text-[9px] text-zinc-400 font-black uppercase tracking-widest">
+                  <span className="flex items-center gap-1 text-blue-500">
+                    <TrendingUp size={12} /> {biz.rating}
+                  </span>
+                  <span className="mx-3 opacity-20 text-zinc-900 dark:text-white">|</span>
+                  <span>{biz.location.split(',')[0]}</span>
+                </div>
               </div>
-              <ChevronRight size={18} className="text-zinc-400 ml-2" />
+              <div className="w-10 h-10 rounded-2xl bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center">
+                <ChevronRight size={18} className="text-zinc-400" />
+              </div>
             </div>
-          ))}
+          )) : (
+            <div className="text-center py-20 space-y-4">
+              <p className="text-zinc-300 font-black uppercase text-xs tracking-widest">Sem resultados</p>
+              <button onClick={() => {setSearch(''); setSelectedCategory(null);}} className="text-blue-600 text-[10px] font-black uppercase tracking-[0.2em] border-b border-blue-600">Resetar Filtros</button>
+            </div>
+          )}
         </div>
       </div>
     </div>

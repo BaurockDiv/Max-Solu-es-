@@ -16,10 +16,8 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [duration, setDuration] = useState(0);
   const [caption, setCaption] = useState('');
   
-  // Etapas: 'capture' -> 'adjust' (apenas foto) -> 'finalize'
   const [step, setStep] = useState<'capture' | 'adjust' | 'finalize'>('capture');
   
-  // Estados de Ajuste (Enquadramento)
   const [zoom, setZoom] = useState(1);
   const [offsetY, setOffsetY] = useState(0);
   
@@ -41,15 +39,41 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const startCamera = async () => {
     stopCamera();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: facingMode, aspectRatio: 9/16 }, 
-        audio: true 
-      });
+      // Constraints de Alta Definição para Mobile
+      const constraints = { 
+        video: { 
+          facingMode: facingMode,
+          // Solicitando resolução Full HD Portrait (1080x1920)
+          width: { ideal: 1080 },
+          height: { ideal: 1920 },
+          aspectRatio: { ideal: 9/16 },
+          frameRate: { ideal: 30 }
+        }, 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        // Garantindo que a renderização do vídeo seja de alta qualidade via JS props
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(e => console.error("Auto-play failed", e));
+        };
+      }
     } catch (err) {
-      console.error("Erro ao acessar câmera:", err);
-      alert("Não foi possível acessar a câmera solicitada.");
+      console.error("Erro ao acessar câmera HD:", err);
+      // Fallback para constraints básicos se o sensor não suportar o ideal solicitado
+      try {
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: true });
+        streamRef.current = fallbackStream;
+        if (videoRef.current) videoRef.current.srcObject = fallbackStream;
+      } catch (fallbackErr) {
+        alert("Não foi possível acessar a câmera do dispositivo.");
+      }
     }
   };
 
@@ -68,17 +92,24 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
+      
+      // Sincronizando o canvas com a resolução nativa do sensor
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
+      
+      const ctx = canvas.getContext('2d', { alpha: false });
       if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        
         if (facingMode === 'user') {
-          ctx.scale(-1, 1); // Mirror apenas para frontal
-          ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-        } else {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
         }
         
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Salvando em JPEG com qualidade máxima (1.0)
         canvas.toBlob((blob) => {
           if (blob) {
             setMediaBlob(blob);
@@ -86,7 +117,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
             setStep('adjust');
             stopCamera();
           }
-        }, 'image/jpeg', 0.95);
+        }, 'image/jpeg', 1.0);
       }
     }
   };
@@ -94,24 +125,53 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const startRecording = () => {
     if (!streamRef.current) return;
     chunksRef.current = [];
-    const recorder = new MediaRecorder(streamRef.current);
-    mediaRecorderRef.current = recorder;
-    recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/mp4' });
-      setMediaBlob(blob);
-      setPreviewUrl(URL.createObjectURL(blob));
-      setIsRecording(false);
-      setStep('finalize');
+    
+    // Configurando bitrate de gravação profissional (5Mbps)
+    const options = {
+      mimeType: 'video/webm;codecs=vp9,opus',
+      videoBitsPerSecond: 5000000 // 5.0 Mbps para alta nitidez
     };
-    recorder.start();
-    setIsRecording(true);
-    setDuration(0);
-    timerRef.current = window.setInterval(() => setDuration(p => p + 1), 1000);
+
+    // Fallback de codec para compatibilidade (Safari/iOS)
+    let finalOptions = options;
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      finalOptions = { 
+        mimeType: 'video/mp4',
+        videoBitsPerSecond: 5000000 
+      };
+    }
+
+    try {
+      const recorder = new MediaRecorder(streamRef.current, finalOptions);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: finalOptions.mimeType });
+        setMediaBlob(blob);
+        setPreviewUrl(URL.createObjectURL(blob));
+        setIsRecording(false);
+        setStep('finalize');
+      };
+      recorder.start(100); // Coleta dados a cada 100ms para estabilidade
+      setIsRecording(true);
+      setDuration(0);
+      timerRef.current = window.setInterval(() => setDuration(p => p + 1), 1000);
+    } catch (e) {
+      console.error("MediaRecorder Error:", e);
+      // Último recurso: gravar sem opções de bitrate se falhar
+      const simpleRecorder = new MediaRecorder(streamRef.current);
+      mediaRecorderRef.current = simpleRecorder;
+      simpleRecorder.start();
+      setIsRecording(true);
+    }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
     if (timerRef.current) clearInterval(timerRef.current);
   };
 
@@ -124,7 +184,6 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
 
   const renderCaptureControls = () => (
     <div className="flex flex-col items-center space-y-8 w-full">
-      {/* Mode Selector */}
       <div className="flex items-center bg-zinc-900/50 backdrop-blur-xl p-1 rounded-full border border-white/5">
         <button 
           onClick={() => setCaptureMode('video')}
@@ -140,7 +199,6 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         </button>
       </div>
 
-      {/* Main Action Area */}
       <div className="flex items-center justify-around w-full max-w-sm">
         <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center text-zinc-500 hover:text-white transition-colors">
           <ImageIcon size={26} />
@@ -149,7 +207,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
 
         <button 
           onClick={captureMode === 'image' ? takePhoto : (isRecording ? stopRecording : startRecording)} 
-          className={`w-24 h-24 rounded-full border-4 ${isRecording ? 'border-red-600' : 'border-white/20'} flex items-center justify-center transition-all active:scale-90 group relative`}
+          className={`w-24 h-24 rounded-full border-4 ${isRecording ? 'border-red-600' : 'border-white/20'} flex items-center justify-center transition-all active:scale-90 group relative shadow-[0_0_30px_rgba(255,255,255,0.1)]`}
         >
             <div className={`transition-all duration-300 ${isRecording ? 'w-10 h-10 bg-red-600 rounded-lg' : captureMode === 'image' ? 'w-18 h-18 bg-white rounded-full' : 'w-18 h-18 bg-white/10 rounded-full border-4 border-white'}`}>
                {!isRecording && captureMode === 'video' && <div className="absolute inset-0 flex items-center justify-center"><div className="w-6 h-6 bg-red-600 rounded-full" /></div>}
@@ -169,11 +227,11 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     <div className="w-full space-y-8">
       <div className="space-y-4 px-4">
         <div className="flex items-center justify-between text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">
-          <div className="flex items-center gap-2"><Maximize size={14}/> Zoom</div>
+          <div className="flex items-center gap-2"><Maximize size={14}/> Zoom de Precisão</div>
           <span className="text-blue-500">{Math.round(zoom * 100)}%</span>
         </div>
         <input 
-          type="range" min="1" max="3" step="0.1" 
+          type="range" min="1" max="3" step="0.01" 
           value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))}
           className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
         />
@@ -182,8 +240,8 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
           <div className="flex items-center gap-2"><Move size={14}/> Posição Vertical</div>
         </div>
         <div className="flex gap-4">
-           <button onClick={() => setOffsetY(o => o - 10)} className="flex-1 py-4 bg-zinc-900 rounded-2xl flex items-center justify-center text-white active:bg-zinc-800 transition-colors"><SlidersHorizontal className="rotate-90" size={20}/></button>
-           <button onClick={() => setOffsetY(o => o + 10)} className="flex-1 py-4 bg-zinc-900 rounded-2xl flex items-center justify-center text-white active:bg-zinc-800 transition-colors"><SlidersHorizontal className="-rotate-90" size={20}/></button>
+           <button onClick={() => setOffsetY(o => o - 5)} className="flex-1 py-4 bg-zinc-900 rounded-2xl flex items-center justify-center text-white active:bg-zinc-800 transition-colors"><SlidersHorizontal className="rotate-90" size={20}/></button>
+           <button onClick={() => setOffsetY(o => o + 5)} className="flex-1 py-4 bg-zinc-900 rounded-2xl flex items-center justify-center text-white active:bg-zinc-800 transition-colors"><SlidersHorizontal className="-rotate-90" size={20}/></button>
            <button onClick={() => { setZoom(1); setOffsetY(0); }} className="px-6 py-4 bg-zinc-800 rounded-2xl text-[10px] font-black text-zinc-400">RESET</button>
         </div>
       </div>
@@ -212,7 +270,6 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         }
       }} />
 
-      {/* Header */}
       <div className="absolute top-0 left-0 right-0 p-8 flex items-center justify-between z-50">
         <button onClick={onCancel} className="w-12 h-12 rounded-[1.2rem] bg-black/40 backdrop-blur-2xl flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all">
           <X size={24} />
@@ -225,18 +282,17 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         )}
       </div>
 
-      {/* Viewport Principal */}
       <div className="flex-1 relative bg-zinc-950 overflow-hidden m-4 rounded-[2.5rem] shadow-2xl border border-white/5 group">
         {step === 'finalize' ? (
           <div className="h-full flex flex-col p-10 justify-center space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="aspect-[3/4] w-52 mx-auto rounded-[2.2rem] overflow-hidden border-4 border-white/10 shadow-2xl relative">
+            <div className="aspect-[3/4] w-52 mx-auto rounded-[2.2rem] overflow-hidden border-4 border-white/10 shadow-2xl relative bg-black">
               {captureMode === 'video' ? (
                 <video src={previewUrl!} autoPlay loop muted className="w-full h-full object-cover" />
               ) : (
                 <img 
                   src={previewUrl!} 
                   className="w-full h-full object-cover" 
-                  style={{ transform: `scale(${zoom}) translateY(${offsetY}px)` }} 
+                  style={{ transform: `scale(${zoom}) translateY(${offsetY}px)`, imageRendering: 'high-quality' }} 
                 />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
@@ -252,7 +308,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
             </div>
           </div>
         ) : (
-          <div className="h-full w-full flex items-center justify-center overflow-hidden">
+          <div className="h-full w-full flex items-center justify-center overflow-hidden bg-black">
             {previewUrl ? (
               <div className="w-full h-full relative">
                 {captureMode === 'video' ? (
@@ -261,7 +317,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
                   <img 
                     src={previewUrl} 
                     className="w-full h-full object-cover transition-transform duration-200" 
-                    style={{ transform: `scale(${zoom}) translateY(${offsetY}px)` }}
+                    style={{ transform: `scale(${zoom}) translateY(${offsetY}px)`, imageRendering: 'high-quality' }}
                   />
                 )}
                 {step === 'adjust' && (
@@ -277,13 +333,13 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
                 autoPlay 
                 muted 
                 playsInline 
+                style={{ imageRendering: 'high-quality' }}
               />
             )}
           </div>
         )}
       </div>
 
-      {/* Footer Controls */}
       <div className="p-10 pb-12 bg-black border-t border-white/5">
         {step === 'capture' && renderCaptureControls()}
         {step === 'adjust' && renderAdjustControls()}
