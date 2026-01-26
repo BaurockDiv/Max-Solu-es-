@@ -1,23 +1,30 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.45.0';
 import { MOCK_POSTS, MOCK_BUSINESSES } from '../data';
+import { Category } from '../types';
 
 const supabaseUrl = 'https://SEU_PROJETO.supabase.co';
 const supabaseAnonKey = 'SUA_ANON_KEY_AQUI';
 
 const isPlaceholder = supabaseUrl.includes('SEU_PROJETO');
 
-// Estado Local para Simulação (Persiste enquanto a aba estiver aberta)
+// Estado Local para Simulação (Persistência em tempo de execução)
 let mockSession: any = null;
 let customPosts = [...MOCK_POSTS];
 const authListeners = new Set<(event: string, session: any) => void>();
+
+// Store para persistir dados do negócio editado pelo usuário
+let mockBusinessStore: any = null;
+
+// Cache para armazenar URLs locais dos arquivos "uploadados"
+const mediaCache = new Map<string, string>();
 
 const mockSupabase = {
   auth: {
     getSession: async () => ({ data: { session: mockSession }, error: null }),
     getUser: async () => ({ data: { user: mockSession?.user || null }, error: null }),
     signInWithPassword: async ({ email }: any) => {
-      const userId = btoa(email).substring(0, 8); // Gera um ID único por e-mail
+      const userId = btoa(email).substring(0, 8);
       mockSession = { user: { id: userId, email }, access_token: 'mock-token' };
       authListeners.forEach(fn => fn('SIGNED_IN', mockSession));
       return { data: { session: mockSession }, error: null };
@@ -41,60 +48,96 @@ const mockSupabase = {
   from: (table: string) => ({
     select: (columns?: string) => ({
       order: () => Promise.resolve({ 
-        data: table === 'posts' ? customPosts : [], 
+        data: table === 'posts' ? [...customPosts] : [], 
         error: null 
       }),
       eq: (col: string, val: any) => ({
-        // Simula busca de negócio do dono ou posts do negócio
         single: () => {
           if (table === 'businesses' && col === 'owner_id') {
-            return Promise.resolve({ 
-              data: { 
+            // Se já editamos o negócio, retornamos a versão editada, senão criamos uma padrão SEGURA
+            if (!mockBusinessStore) {
+              mockBusinessStore = { 
                 id: `biz-${val}`, 
-                name: `Empresa de ${mockSession?.user?.email?.split('@')[0]}`,
+                name: "Meu Negócio", // NOME PADRÃO SEGURO (Sem e-mail)
                 logo: 'https://picsum.photos/200/200',
-                category: 'Professional Services',
-                owner_id: val
-              }, 
-              error: null 
-            });
+                category: Category.SERVICES,
+                owner_id: val,
+                bio: "Bem-vindo ao meu perfil profissional.",
+                verified: true,
+                location: "Brasil",
+                hours: "09:00 - 18:00",
+                links: [],
+                contact: { email: mockSession?.user?.email },
+                rating: 5.0,
+                reviewCount: 0
+              };
+            }
+            return Promise.resolve({ data: mockBusinessStore, error: null });
           }
           return Promise.resolve({ data: null, error: null });
         },
         select: () => Promise.resolve({ 
-          data: table === 'posts' ? customPosts.filter(p => p.businessId === val) : [], 
+          data: table === 'posts' ? customPosts.filter(p => (p as any).business_id === val || p.businessId === val) : [], 
           error: null 
         })
       })
     }),
+    update: (obj: any) => ({
+      eq: (col: string, val: any) => {
+        if (table === 'businesses') {
+          // "Persiste" no banco de dados simulado
+          mockBusinessStore = { ...mockBusinessStore, ...obj };
+          // Atualiza posts existentes para refletir as novas infos do negócio
+          customPosts = customPosts.map(p => {
+            if (p.businessId === mockBusinessStore.id || (p as any).business_id === mockBusinessStore.id) {
+              return { ...p, business: mockBusinessStore };
+            }
+            return p;
+          });
+        }
+        return Promise.resolve({ data: mockBusinessStore, error: null });
+      }
+    }),
     insert: (obj: any) => {
       if (table === 'posts') {
+        const businessData = mockBusinessStore || { 
+          id: obj.business_id, 
+          name: "Meu Negócio", 
+          logo: 'https://picsum.photos/200/200', 
+          category: Category.SERVICES 
+        };
+        
         const newPost = {
           id: `p-${Date.now()}`,
           businessId: obj.business_id,
           type: obj.type,
-          url: obj.media_url,
+          url: obj.media_url, 
           thumbnail: obj.media_url,
           caption: obj.caption,
-          ctaText: obj.cta_text,
+          ctaText: obj.cta_text || "Saiba Mais",
           ctaUrl: '#',
-          // Fix: Added missing required property 'tags' to satisfy MediaPost interface
-          tags: [],
+          tags: ["#bizstream", "#profissional"],
           likes: 0,
           isAffiliate: false,
           created_at: new Date().toISOString(),
-          business: { name: "Meu Negócio", logo: 'https://picsum.photos/200/200' }
+          business: { ...businessData } // Vincula os dados ATUAIS e PÚBLICOS do negócio
         };
-        // Fix: Use type casting to any to allow updating customPosts in mock implementation
         customPosts = [(newPost as any), ...customPosts];
       }
       return Promise.resolve({ data: null, error: null });
     }
   }),
   storage: {
-    from: () => ({
-      upload: () => Promise.resolve({ data: { path: 'mock/path' }, error: null }),
-      getPublicUrl: () => ({ data: { publicUrl: 'https://picsum.photos/seed/' + Math.random() + '/800/1200' } })
+    from: (bucket: string) => ({
+      upload: (path: string, file: Blob) => {
+        const localUrl = URL.createObjectURL(file);
+        mediaCache.set(path, localUrl);
+        return Promise.resolve({ data: { path }, error: null });
+      },
+      getPublicUrl: (path: string) => {
+        const publicUrl = mediaCache.get(path) || 'https://picsum.photos/1080/1920';
+        return { data: { publicUrl } };
+      }
     })
   }
 };

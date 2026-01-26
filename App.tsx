@@ -10,6 +10,7 @@ import {
   LogIn
 } from 'lucide-react';
 import { ViewState, Business, MediaPost } from './types';
+import { MOCK_BUSINESSES } from './data';
 import FeedView from './components/FeedView';
 import DiscoveryView from './components/DiscoveryView';
 import ProfileView from './components/ProfileView';
@@ -22,6 +23,7 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [userBusiness, setUserBusiness] = useState<Business | null>(null);
   const [activeTab, setActiveTab] = useState<ViewState>('feed');
+  const [lastTab, setLastTab] = useState<ViewState>('feed');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [allPosts, setAllPosts] = useState<MediaPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,10 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) fetchUserBusiness(session.user.id);
-      else setUserBusiness(null);
+      else {
+        setUserBusiness(null);
+        setActiveTab('feed');
+      }
     });
 
     fetchData();
@@ -64,7 +69,8 @@ const App: React.FC = () => {
           ...p,
           businessId: p.businessId || p.business_id,
           url: p.url || p.media_url,
-          thumbnail: p.thumbnail || p.thumbnail_url
+          thumbnail: p.thumbnail || p.thumbnail_url,
+          business: p.business || { id: p.businessId || p.business_id, name: "Empresa Parceira", logo: 'https://picsum.photos/200/200' }
         }));
         setAllPosts(normalized as any);
       }
@@ -73,7 +79,18 @@ const App: React.FC = () => {
     }
   };
 
-  const handleNewPost = async (mediaBlob: Blob, type: 'video' | 'image') => {
+  const handleUpdateBusiness = (updatedBiz: Business) => {
+    setUserBusiness(updatedBiz);
+    // Sincronização instantânea nos posts da memória
+    setAllPosts(current => current.map(post => {
+      if (post.businessId === updatedBiz.id || post.business?.id === updatedBiz.id) {
+        return { ...post, business: updatedBiz };
+      }
+      return post;
+    }));
+  };
+
+  const handleNewPost = async (mediaBlob: Blob, type: 'video' | 'image', caption: string) => {
     if (!session) return;
 
     try {
@@ -84,7 +101,7 @@ const App: React.FC = () => {
       }
 
       if (!bizId) {
-        alert("Erro: Não foi possível identificar seu perfil de negócio.");
+        alert("Erro: Crie um perfil de negócio primeiro.");
         return;
       }
 
@@ -101,8 +118,8 @@ const App: React.FC = () => {
         business_id: bizId,
         type: type,
         media_url: publicUrl,
-        caption: "Nova publicação do meu negócio ✨",
-        cta_text: "Ver Mais"
+        caption: caption || "Publicação sem legenda",
+        cta_text: "Saiba Mais"
       });
 
       if (!dbError) {
@@ -114,19 +131,28 @@ const App: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-zinc-950 text-white font-bold tracking-widest">BIZSTREAM</div>;
-
   const navigateToProfile = (businessId: string) => {
-    const post = allPosts.find(p => (p.businessId === businessId || (p as any).business_id === businessId));
-    const biz = post?.business;
-    if (biz) {
-      setSelectedBusiness(biz as any);
+    const post = allPosts.find(p => p.businessId === businessId);
+    if (post?.business) {
+      setSelectedBusiness(post.business as any);
+      setLastTab(activeTab);
       setActiveTab('profile');
+    } else {
+      const biz = MOCK_BUSINESSES[businessId];
+      if (biz) {
+        setSelectedBusiness(biz as any);
+        setLastTab(activeTab);
+        setActiveTab('profile');
+      }
     }
   };
 
+  const changeTab = (tab: ViewState) => {
+    setLastTab(activeTab);
+    setActiveTab(tab);
+  };
+
   const renderContent = () => {
-    // Rotas Protegidas que exigem login
     if (!session && (activeTab === 'me' || activeTab === 'dashboard' || activeTab === 'record')) {
       return <AuthView onBack={() => setActiveTab('feed')} />;
     }
@@ -137,11 +163,17 @@ const App: React.FC = () => {
       case 'discovery':
         return <DiscoveryView onBusinessClick={navigateToProfile} />;
       case 'profile':
-        return <ProfileView business={selectedBusiness || ({} as any)} onBack={() => setActiveTab('feed')} />;
+        return (
+          <ProfileView 
+            business={selectedBusiness || ({} as any)} 
+            posts={allPosts.filter(p => (p.businessId === selectedBusiness?.id || p.business?.id === selectedBusiness?.id))}
+            onBack={() => setActiveTab(lastTab)} 
+          />
+        );
       case 'dashboard':
-        return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
+        return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => (p.businessId === userBusiness?.id || p.business?.id === userBusiness?.id))} />;
       case 'me':
-        return <MeView session={session} business={userBusiness} />;
+        return <MeView session={session} business={userBusiness} onUpdateBusiness={handleUpdateBusiness} />;
       case 'record':
         return <RecordView onCancel={() => setActiveTab('feed')} onPost={handleNewPost} />;
       default:
@@ -149,32 +181,32 @@ const App: React.FC = () => {
     }
   };
 
+  if (loading) return <div className="h-screen flex items-center justify-center bg-zinc-950 text-white font-bold tracking-widest animate-pulse uppercase">Carregando BizStream</div>;
+
   return (
     <div className="mobile-frame bg-white dark:bg-zinc-950 flex flex-col h-screen overflow-hidden">
       <main className="flex-1 overflow-y-auto hide-scrollbar relative bg-zinc-50 dark:bg-zinc-950">
         {renderContent()}
       </main>
 
-      {/* Navegação aparece apenas se não estivermos na tela de gravação ou se o login não estiver sobrepondo algo crítico */}
       {activeTab !== 'record' && (
         <nav className="h-16 border-t border-zinc-100 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md flex items-center justify-around px-2 z-50">
-          <NavButton active={activeTab === 'feed'} icon={<Home size={22} />} label="Início" onClick={() => setActiveTab('feed')} />
-          <NavButton active={activeTab === 'discovery'} icon={<Search size={22} />} label="Explorar" onClick={() => setActiveTab('discovery')} />
+          <NavButton active={activeTab === 'feed'} icon={<Home size={22} />} label="Início" onClick={() => changeTab('feed')} />
+          <NavButton active={activeTab === 'discovery'} icon={<Search size={22} />} label="Explorar" onClick={() => changeTab('discovery')} />
           
           <div className="flex flex-col items-center justify-center p-2">
-            <div onClick={() => setActiveTab('record')} className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-95 transition-all cursor-pointer">
+            <div onClick={() => changeTab('record')} className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-95 transition-all cursor-pointer">
               <PlusSquare size={24} />
             </div>
           </div>
 
-          <NavButton active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22} />} label="Painel" onClick={() => setActiveTab('dashboard')} />
+          <NavButton active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22} />} label="Painel" onClick={() => changeTab('dashboard')} />
           
-          {/* Seção dinâmica do menu baseada no login */}
           <NavButton 
             active={activeTab === 'me'} 
             icon={session ? <User size={22} /> : <LogIn size={22} />} 
             label={session ? "Perfil" : "Entrar"} 
-            onClick={() => setActiveTab('me')} 
+            onClick={() => changeTab('me')} 
           />
         </nav>
       )}

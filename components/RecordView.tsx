@@ -1,13 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Camera, RotateCcw, Send, Sparkles, Zap, Image as ImageIcon } from 'lucide-react';
+import { X, Camera, RotateCcw, Send, Sparkles, Zap, Image as ImageIcon, CheckCircle } from 'lucide-react';
 
 interface RecordViewProps {
   onCancel: () => void;
-  onPost: (blob: Blob, type: 'video' | 'image') => void;
+  onPost: (blob: Blob, type: 'video' | 'image', caption: string) => void;
 }
 
-const MAX_DURATION = 60; // seconds
+const MAX_DURATION = 60;
 
 const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -16,6 +16,9 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [caption, setCaption] = useState('');
+  const [isFinalStep, setIsFinalStep] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -36,233 +39,112 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         audio: true 
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      if (videoRef.current) videoRef.current.srcObject = stream;
     } catch (err) {
-      setError("Acesso à câmera negado. Por favor, habilite as permissões.");
-      console.error(err);
+      setError("Permissão de câmera negada.");
     }
   };
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-  };
-
-  const handleToggleRecording = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
+    if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
   };
 
   const startRecording = () => {
     if (!streamRef.current) return;
-
     chunksRef.current = [];
     const recorder = new MediaRecorder(streamRef.current);
     mediaRecorderRef.current = recorder;
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
-
+    recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/mp4' });
       setMediaBlob(blob);
       setMediaType('video');
       setPreviewUrl(URL.createObjectURL(blob));
       setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
     };
-
     recorder.start();
     setIsRecording(true);
     setDuration(0);
-
-    timerRef.current = window.setInterval(() => {
-      setDuration(prev => {
-        if (prev >= MAX_DURATION) {
-          stopRecording();
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 1000);
+    timerRef.current = window.setInterval(() => setDuration(p => p + 1), 1000);
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-    }
+    if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
+    if (timerRef.current) clearInterval(timerRef.current);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    const isVideo = file.type.startsWith('video/');
-    const isImage = file.type.startsWith('image/');
-
-    if (isVideo || isImage) {
-      setMediaType(isVideo ? 'video' : 'image');
+    if (file) {
+      setMediaType(file.type.startsWith('video/') ? 'video' : 'image');
       setMediaBlob(file);
       setPreviewUrl(URL.createObjectURL(file));
       stopCamera();
-    } else {
-      alert("Por favor, selecione uma imagem ou vídeo válido.");
     }
   };
 
-  const handleDiscard = () => {
-    setMediaBlob(null);
-    setPreviewUrl(null);
-    setDuration(0);
-    startCamera();
-  };
-
-  const handlePost = () => {
-    if (mediaBlob) {
-      onPost(mediaBlob, mediaType);
+  const handlePost = async () => {
+    if (mediaBlob && !isPublishing) {
+      setIsPublishing(true);
+      await onPost(mediaBlob, mediaType, caption);
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black z-[100] flex flex-col overflow-hidden">
-      {/* Input de arquivo oculto */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="image/*,video/*"
-        onChange={handleFileSelect}
-      />
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
 
-      {/* Top Header */}
       <div className="absolute top-0 left-0 right-0 p-6 flex items-center justify-between z-10">
-        <button 
-          onClick={onCancel}
-          className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
-        >
-          <X size={24} />
-        </button>
-
-        {isRecording && (
-          <div className="flex items-center space-x-2 bg-red-600/80 px-3 py-1.5 rounded-full text-white text-xs font-bold animate-pulse">
-            <div className="w-2 h-2 rounded-full bg-white" />
-            <span>00:{duration < 10 ? `0${duration}` : duration}</span>
-          </div>
-        )}
-
-        {!previewUrl && (
-          <div className="flex space-x-4">
-             <button className="text-white opacity-80 hover:opacity-100 transition-opacity"><Zap size={22} /></button>
-             <button className="text-white opacity-80 hover:opacity-100 transition-opacity"><Sparkles size={22} /></button>
-          </div>
-        )}
+        <button onClick={onCancel} className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white"><X size={24} /></button>
+        {isRecording && <div className="bg-red-600 px-3 py-1 rounded-full text-white text-xs font-bold animate-pulse">00:{duration < 10 ? `0${duration}` : duration}</div>}
       </div>
 
-      {/* Viewfinder / Preview */}
       <div className="flex-1 relative bg-zinc-900 overflow-hidden">
-        {previewUrl ? (
-          mediaType === 'video' ? (
-            <video 
-              src={previewUrl} 
-              className="w-full h-full object-cover" 
-              autoPlay 
-              loop 
-              playsInline 
-            />
-          ) : (
-            <img 
-              src={previewUrl} 
-              className="w-full h-full object-cover" 
-              alt="Preview"
-            />
-          )
+        {isFinalStep ? (
+          <div className="h-full flex flex-col p-8 bg-zinc-950 justify-center space-y-6">
+            <div className="aspect-[3/4] w-48 mx-auto rounded-3xl overflow-hidden border-2 border-white/10 shadow-2xl rotate-2">
+              {mediaType === 'video' ? <video src={previewUrl!} autoPlay loop muted className="w-full h-full object-cover" /> : <img src={previewUrl!} className="w-full h-full object-cover" />}
+            </div>
+            <div className="space-y-4">
+              <h2 className="text-xl font-black text-white text-center">Finalizar Publicação</h2>
+              <textarea 
+                placeholder="Escreva algo sobre este conteúdo..."
+                className="w-full bg-zinc-900 border-none rounded-2xl p-4 text-white text-sm focus:ring-2 focus:ring-blue-500 h-32 resize-none"
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+              />
+            </div>
+          </div>
         ) : (
-          <video 
-            ref={videoRef} 
-            className="w-full h-full object-cover scale-x-[-1]" 
-            autoPlay 
-            muted 
-            playsInline 
-          />
-        )}
-
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center p-10 text-center">
-            <p className="text-white text-sm font-medium">{error}</p>
-          </div>
-        )}
-
-        {/* Recording Progress Bar */}
-        {isRecording && (
-          <div className="absolute top-0 left-0 w-full h-1 bg-white/20">
-            <div 
-              className="h-full bg-red-600 transition-all duration-1000 ease-linear" 
-              style={{ width: `${(duration / MAX_DURATION) * 100}%` }}
-            />
-          </div>
+          previewUrl ? (
+            mediaType === 'video' ? <video src={previewUrl} className="w-full h-full object-cover" autoPlay loop playsInline /> : <img src={previewUrl} className="w-full h-full object-cover" />
+          ) : (
+            <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" autoPlay muted playsInline />
+          )
         )}
       </div>
 
-      {/* Footer Controls */}
-      <div className="p-10 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col items-center">
+      <div className="p-8 bg-zinc-950">
         {!previewUrl ? (
-          <div className="flex items-center justify-between w-full max-w-sm">
-             <div className="flex-1 flex justify-center">
-               <button 
-                 onClick={() => fileInputRef.current?.click()}
-                 className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md text-white flex flex-col items-center justify-center active:scale-95 transition-all border border-white/20"
-               >
-                 <ImageIcon size={20} />
-                 <span className="text-[8px] font-black uppercase mt-0.5">Galeria</span>
-               </button>
-             </div>
-             
-             <button 
-               onClick={handleToggleRecording}
-               className={`relative flex items-center justify-center w-20 h-20 rounded-full border-4 ${isRecording ? 'border-red-600' : 'border-white'} transition-all duration-300 transform active:scale-90`}
-             >
-               <div className={`w-16 h-16 rounded-full transition-all duration-300 ${isRecording ? 'bg-red-600 scale-50 rounded-lg' : 'bg-white'}`} />
-             </button>
-
-             <div className="flex-1 flex justify-center">
-               <button 
-                 onClick={startCamera}
-                 className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center active:scale-95 transition-all border border-white/20"
-               >
-                 <RotateCcw size={20} />
-               </button>
-             </div>
+          <div className="flex items-center justify-around w-full">
+            <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center text-white opacity-60"><ImageIcon size={24} /><span className="text-[10px] mt-1 uppercase font-bold">Galeria</span></button>
+            <button onClick={isRecording ? stopRecording : startRecording} className={`w-20 h-20 rounded-full border-4 ${isRecording ? 'border-red-600' : 'border-white'} flex items-center justify-center`}><div className={`w-14 h-14 rounded-full ${isRecording ? 'bg-red-600 scale-50 rounded-xl' : 'bg-white'}`} /></button>
+            <button onClick={startCamera} className="text-white opacity-60"><RotateCcw size={24} /></button>
           </div>
         ) : (
-          <div className="flex space-x-4 w-full max-w-xs">
-            <button 
-              onClick={handleDiscard}
-              className="flex-1 py-4 bg-zinc-800 text-white rounded-2xl font-bold flex items-center justify-center space-x-2 active:scale-95 transition-transform"
-            >
-              <RotateCcw size={18} />
-              <span>Descartar</span>
-            </button>
-            <button 
-              onClick={handlePost}
-              className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold flex items-center justify-center space-x-2 shadow-xl shadow-blue-500/20 active:scale-95 transition-transform"
-            >
-              <Send size={18} />
-              <span>Publicar</span>
-            </button>
+          <div className="flex space-x-4">
+            {!isFinalStep ? (
+              <>
+                <button onClick={() => {setPreviewUrl(null); startCamera();}} className="flex-1 py-4 bg-zinc-800 text-white rounded-2xl font-bold flex items-center justify-center gap-2"><RotateCcw size={18}/>Refazer</button>
+                <button onClick={() => setIsFinalStep(true)} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2">Próximo<CheckCircle size={18}/></button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setIsFinalStep(false)} className="px-6 py-4 bg-zinc-800 text-white rounded-2xl font-bold">Voltar</button>
+                <button onClick={handlePost} disabled={isPublishing} className="flex-1 py-4 bg-green-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2">{isPublishing ? 'Publicando...' : 'Confirmar & Publicar'}<Send size={18}/></button>
+              </>
+            )}
           </div>
-        )}
-        
-        {!isRecording && !previewUrl && (
-          <p className="mt-6 text-white/50 text-[10px] font-bold uppercase tracking-widest">
-            Grave até {MAX_DURATION}s ou escolha um arquivo
-          </p>
         )}
       </div>
     </div>

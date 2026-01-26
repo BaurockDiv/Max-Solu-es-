@@ -20,7 +20,8 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick }) => {
 };
 
 const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void }> = ({ post, onProfileClick }) => {
-  const business = MOCK_BUSINESSES[post.businessId] || MOCK_BUSINESSES['b1'];
+  // Prioridade: objeto business do post > MOCK fixo > fallback b1
+  const business = post.business || MOCK_BUSINESSES[post.businessId] || MOCK_BUSINESSES['b1'];
   const videoRef = useRef<HTMLVideoElement>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
@@ -32,20 +33,15 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          // Quando pelo menos 60% do vídeo está visível, tenta reproduzir
           if (videoRef.current) {
             const playPromise = videoRef.current.play();
             if (playPromise !== undefined) {
               playPromise
                 .then(() => setIsPlaying(true))
-                .catch(() => {
-                  // Autoplay bloqueado pelo navegador até interação
-                  setIsPlaying(false);
-                });
+                .catch(() => setIsPlaying(false));
             }
           }
         } else {
-          // Pausa e reseta quando sai da tela para poupar recursos
           if (videoRef.current) {
             videoRef.current.pause();
             videoRef.current.currentTime = 0;
@@ -54,7 +50,7 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
           setIsReady(false);
         }
       },
-      { threshold: 0.6 } // Limite de 60% de visibilidade
+      { threshold: 0.6 }
     );
 
     if (videoRef.current) observer.observe(videoRef.current);
@@ -82,7 +78,6 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
     <div className="h-full w-full snap-start relative flex items-center justify-center bg-zinc-950 overflow-hidden">
       {post.type === 'video' ? (
         <>
-          {/* Thumbnail/Poster fixo para transição suave */}
           <div className={`absolute inset-0 z-0 transition-opacity duration-500 ${isReady ? 'opacity-0' : 'opacity-100'}`}>
             <img 
               src={post.thumbnail} 
@@ -104,7 +99,6 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
             onPlaying={handlePlaying}
           />
 
-          {/* Indicador de Buffering */}
           {isBuffering && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
               <Loader2 className="w-10 h-10 text-white/50 animate-spin" />
@@ -115,10 +109,8 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
         <img src={post.url} className="h-full w-full object-cover" alt={post.caption} />
       )}
 
-      {/* Gradiente Overlay para Leitura */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 pointer-events-none z-20" />
 
-      {/* Conteúdo Overlay */}
       <div className="absolute bottom-6 left-4 right-16 text-white space-y-3 z-30">
         <div 
           onClick={() => onProfileClick(post.businessId)}
@@ -150,7 +142,6 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
         </div>
       </div>
 
-      {/* Botões de Ação Laterais */}
       <div className="absolute right-3 bottom-24 flex flex-col items-center space-y-6 text-white z-30">
         <ActionButton 
           active={liked}
