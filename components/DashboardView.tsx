@@ -3,7 +3,9 @@ import React, { useState } from 'react';
 import { 
   BarChart, 
   Bar, 
-  ResponsiveContainer
+  ResponsiveContainer,
+  XAxis,
+  Tooltip
 } from 'recharts';
 import { Eye, MousePointer2, TrendingUp, PlayCircle } from 'lucide-react';
 import { Business, MediaPost } from '../types';
@@ -25,18 +27,18 @@ const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts }) =>
   const totalViews = userPosts.reduce((acc, p) => acc + (p.likes * 12), 0);
 
   return (
-    <div className="p-6 space-y-10 bg-white dark:bg-black transition-colors duration-500">
+    <div className="p-6 space-y-10 bg-white dark:bg-black transition-colors duration-500 pb-32 overflow-y-auto h-full">
       <div className="flex justify-between items-center px-2">
         <div className="space-y-2">
           <h1 className="text-4xl font-black tracking-tighter text-zinc-950 dark:text-white uppercase">Painel</h1>
           <p className="text-[10px] text-zinc-400 font-black uppercase tracking-[0.3em]">Gestão: {business?.name || "Global"}</p>
         </div>
-        <div className="w-16 h-16 rounded-[2rem] bg-blue-600 flex items-center justify-center text-white shadow-2xl">
+        <div className="w-16 h-16 rounded-[2rem] bg-blue-600 flex items-center justify-center text-white shadow-2xl animate-pulse">
             <TrendingUp size={30} />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <StatCard 
           active={activeMetric === 'views'}
           onClick={() => setActiveMetric('views')}
@@ -63,6 +65,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts }) =>
         <div className="h-56 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={viewData}>
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold'}} />
+              <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '16px', border: 'none', fontWeight: 'bold', fontSize: '10px'}} />
               <Bar dataKey="val" fill="#2563eb" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -71,22 +75,22 @@ const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts }) =>
 
       <div className="space-y-6">
         <h3 className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.5em] px-4">Inventário de Mídia</h3>
-        <div className="space-y-5">
+        <div className="grid grid-cols-1 gap-5">
             {userPosts.map(post => (
                 <div key={post.id} className="flex items-center gap-6 p-6 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-900 rounded-[2.5rem] shadow-sm hover:scale-[1.01] transition-all">
-                    <div className="relative w-20 h-20 rounded-[1.8rem] overflow-hidden shadow-lg border-2 border-white dark:border-black">
+                    <div className="relative w-20 h-20 rounded-[1.8rem] overflow-hidden shadow-lg border-2 border-white dark:border-black flex-shrink-0">
                       <img src={post.thumbnail} className="w-full h-full object-cover" />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30"><PlayCircle className="text-white" size={24} /></div>
                     </div>
-                    <div className="flex-1">
-                        <p className="text-sm font-black text-zinc-950 dark:text-white uppercase tracking-tight line-clamp-1">{post.caption}</p>
+                    <div className="flex-1 overflow-hidden">
+                        <p className="text-sm font-black text-zinc-950 dark:text-white uppercase tracking-tight line-clamp-1 truncate">{post.caption}</p>
                         <div className="flex items-center gap-4 mt-1">
-                           <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Visualizações: {post.likes * 5}</span>
+                           <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Vistas: {post.likes * 5}</span>
                         </div>
                     </div>
                     <button 
                       onClick={() => { setIsBoosting(post.id); setTimeout(() => setIsBoosting(null), 2000); }}
-                      className="text-[10px] font-black px-6 py-4 rounded-[1.5rem] bg-blue-600 text-white active:scale-90 transition-all uppercase tracking-widest shadow-lg shadow-blue-500/10"
+                      className="text-[10px] font-black px-6 py-4 rounded-[1.5rem] bg-blue-600 text-white active:scale-90 transition-all uppercase tracking-widest shadow-lg shadow-blue-500/10 flex-shrink-0"
                     >
                       {isBoosting === post.id ? '...' : 'Boost'}
                     </button>

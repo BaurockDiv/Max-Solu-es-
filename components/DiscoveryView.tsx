@@ -24,7 +24,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
   }, [search, selectedCategory]);
 
   return (
-    <div className="flex flex-col min-h-full bg-white dark:bg-black p-6 space-y-8 transition-colors duration-500">
+    <div className="flex flex-col min-h-full bg-white dark:bg-black p-6 space-y-8 transition-colors duration-500 overflow-y-auto pb-32">
       <div className="space-y-5">
         <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-white">Descoberta</h1>
         <div className="relative group">
@@ -32,7 +32,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
           <input 
             type="text" 
             placeholder="Buscar empresas, serviços, talentos..."
-            className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-[1.5rem] py-5 pl-12 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all border-none placeholder:text-zinc-400 text-zinc-900 dark:text-white"
+            className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-[1.5rem] py-5 pl-12 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all border-none placeholder:text-zinc-400 text-zinc-900 dark:text-white shadow-inner"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -75,7 +75,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
           <button className="text-blue-600 text-[10px] font-black uppercase tracking-widest">São Paulo, BR</button>
         </div>
         
-        <div className="space-y-4 pb-28">
+        <div className="grid grid-cols-1 gap-4">
           {filteredBusinesses.length > 0 ? filteredBusinesses.map((biz) => (
             <div 
               key={biz.id} 
@@ -83,18 +83,18 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
               className="flex items-center p-4 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all cursor-pointer active:scale-[0.98] bg-white dark:bg-zinc-900 shadow-sm"
             >
               <img src={biz.logo} className="w-16 h-16 rounded-[1.4rem] object-cover shadow-md" alt={biz.name} />
-              <div className="ml-5 flex-1">
-                <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight">{biz.name}</h3>
+              <div className="ml-5 flex-1 overflow-hidden">
+                <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight truncate">{biz.name}</h3>
                 <p className="text-[11px] text-zinc-500 font-medium line-clamp-1 mb-1">{biz.bio}</p>
                 <div className="flex items-center text-[9px] text-zinc-400 font-black uppercase tracking-widest">
                   <span className="flex items-center gap-1 text-blue-500">
                     <TrendingUp size={12} /> {biz.rating}
                   </span>
                   <span className="mx-3 opacity-20 text-zinc-900 dark:text-white">|</span>
-                  <span>{biz.location.split(',')[0]}</span>
+                  <span className="truncate">{biz.location.split(',')[0]}</span>
                 </div>
               </div>
-              <div className="w-10 h-10 rounded-2xl bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-2xl bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0">
                 <ChevronRight size={18} className="text-zinc-400" />
               </div>
             </div>
