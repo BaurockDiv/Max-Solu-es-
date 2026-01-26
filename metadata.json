@@ -1,0 +1,9 @@
+{
+  "name": "BizStream - Professional Discovery Platform",
+  "description": "A mobile-first vertical scrolling platform for professional discovery, connecting businesses, freelancers, and service providers with customers through high-impact short-form media.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
