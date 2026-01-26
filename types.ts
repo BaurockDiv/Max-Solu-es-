@@ -40,6 +40,7 @@ export interface MediaPost {
   tags: string[];
   likes: number;
   isAffiliate: boolean;
+  business?: Business;
 }
 
-export type ViewState = 'feed' | 'discovery' | 'profile' | 'dashboard' | 'docs' | 'record';
+export type ViewState = 'feed' | 'discovery' | 'profile' | 'dashboard' | 'me' | 'record';

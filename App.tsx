@@ -1,66 +1,147 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
 import { 
   Home, 
   Search, 
   LayoutDashboard, 
-  FileText, 
-  PlusSquare
+  User, 
+  PlusSquare,
+  LogIn
 } from 'lucide-react';
-import { MOCK_POSTS, MOCK_BUSINESSES } from './data';
 import { ViewState, Business, MediaPost } from './types';
 import FeedView from './components/FeedView';
 import DiscoveryView from './components/DiscoveryView';
 import ProfileView from './components/ProfileView';
 import DashboardView from './components/DashboardView';
-import DocumentationView from './components/DocumentationView';
+import MeView from './components/MeView';
 import RecordView from './components/RecordView';
+import AuthView from './components/AuthView';
 
 const App: React.FC = () => {
+  const [session, setSession] = useState<any>(null);
+  const [userBusiness, setUserBusiness] = useState<Business | null>(null);
   const [activeTab, setActiveTab] = useState<ViewState>('feed');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
-  const [allPosts, setAllPosts] = useState<MediaPost[]>(MOCK_POSTS);
+  const [allPosts, setAllPosts] = useState<MediaPost[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const navigateToProfile = (businessId: string) => {
-    setSelectedBusiness(MOCK_BUSINESSES[businessId]);
-    setActiveTab('profile');
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) fetchUserBusiness(session.user.id);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) fetchUserBusiness(session.user.id);
+      else setUserBusiness(null);
+    });
+
+    fetchData();
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchUserBusiness = async (userId: string) => {
+    const { data } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('owner_id', userId)
+      .single();
+    if (data) setUserBusiness(data as any);
   };
 
-  const handleNewPost = (mediaBlob: Blob, type: 'video' | 'image') => {
-    // Cria uma URL para o arquivo (seja vindo da câmera ou galeria)
-    const mediaUrl = URL.createObjectURL(mediaBlob);
-    
-    const newPost: MediaPost = {
-      id: `p-${Date.now()}`,
-      businessId: 'b1', // Artisan Brews
-      type: type,
-      url: mediaUrl,
-      thumbnail: type === 'image' ? mediaUrl : 'https://picsum.photos/seed/vid-thumb/1080/1920',
-      caption: `Novo conteúdo ${type === 'image' ? 'fotográfico' : 'em vídeo'} publicado via BizStudio! ✨`,
-      ctaText: 'Ver Detalhes',
-      ctaUrl: '#',
-      tags: ['#bizstream', '#novidade'],
-      likes: 0,
-      isAffiliate: false
-    };
+  const fetchData = async () => {
+    try {
+      const { data: posts } = await supabase
+        .from('posts')
+        .select(`*, business:businesses(*)`)
+        .order('created_at', { ascending: false });
+      
+      if (posts) {
+        const normalized = posts.map((p: any) => ({
+          ...p,
+          businessId: p.businessId || p.business_id,
+          url: p.url || p.media_url,
+          thumbnail: p.thumbnail || p.thumbnail_url
+        }));
+        setAllPosts(normalized as any);
+      }
+    } catch (err) {
+      console.warn("Erro ao buscar posts:", err);
+    }
+  };
 
-    setAllPosts([newPost, ...allPosts]);
-    setActiveTab('feed');
-    alert(`Seu ${type === 'image' ? 'post' : 'vídeo'} foi publicado com sucesso!`);
+  const handleNewPost = async (mediaBlob: Blob, type: 'video' | 'image') => {
+    if (!session) return;
+
+    try {
+      let bizId = userBusiness?.id;
+      if (!bizId) {
+        const { data: biz } = await supabase.from('businesses').select('id').eq('owner_id', session.user.id).single();
+        bizId = biz?.id;
+      }
+
+      if (!bizId) {
+        alert("Erro: Não foi possível identificar seu perfil de negócio.");
+        return;
+      }
+
+      const fileName = `${Date.now()}.${type === 'video' ? 'mp4' : 'jpg'}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(`${session.user.id}/${fileName}`, mediaBlob);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(uploadData.path);
+
+      const { error: dbError } = await supabase.from('posts').insert({
+        business_id: bizId,
+        type: type,
+        media_url: publicUrl,
+        caption: "Nova publicação do meu negócio ✨",
+        cta_text: "Ver Mais"
+      });
+
+      if (!dbError) {
+        await fetchData();
+        setActiveTab('feed');
+      }
+    } catch (err: any) {
+      alert("Erro ao publicar: " + err.message);
+    }
+  };
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-zinc-950 text-white font-bold tracking-widest">BIZSTREAM</div>;
+
+  const navigateToProfile = (businessId: string) => {
+    const post = allPosts.find(p => (p.businessId === businessId || (p as any).business_id === businessId));
+    const biz = post?.business;
+    if (biz) {
+      setSelectedBusiness(biz as any);
+      setActiveTab('profile');
+    }
   };
 
   const renderContent = () => {
+    // Rotas Protegidas que exigem login
+    if (!session && (activeTab === 'me' || activeTab === 'dashboard' || activeTab === 'record')) {
+      return <AuthView onBack={() => setActiveTab('feed')} />;
+    }
+
     switch (activeTab) {
       case 'feed':
         return <FeedView posts={allPosts} onProfileClick={navigateToProfile} />;
       case 'discovery':
         return <DiscoveryView onBusinessClick={navigateToProfile} />;
       case 'profile':
-        return <ProfileView business={selectedBusiness || MOCK_BUSINESSES['b1']} onBack={() => setActiveTab('feed')} />;
+        return <ProfileView business={selectedBusiness || ({} as any)} onBack={() => setActiveTab('feed')} />;
       case 'dashboard':
-        return <DashboardView />;
-      case 'docs':
-        return <DocumentationView />;
+        return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
+      case 'me':
+        return <MeView session={session} business={userBusiness} />;
       case 'record':
         return <RecordView onCancel={() => setActiveTab('feed')} onPost={handleNewPost} />;
       default:
@@ -74,39 +155,26 @@ const App: React.FC = () => {
         {renderContent()}
       </main>
 
+      {/* Navegação aparece apenas se não estivermos na tela de gravação ou se o login não estiver sobrepondo algo crítico */}
       {activeTab !== 'record' && (
         <nav className="h-16 border-t border-zinc-100 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md flex items-center justify-around px-2 z-50">
-          <NavButton 
-            active={activeTab === 'feed'} 
-            icon={<Home size={22} />} 
-            label="Feed" 
-            onClick={() => setActiveTab('feed')} 
-          />
-          <NavButton 
-            active={activeTab === 'discovery'} 
-            icon={<Search size={22} />} 
-            label="Explore" 
-            onClick={() => setActiveTab('discovery')} 
-          />
+          <NavButton active={activeTab === 'feed'} icon={<Home size={22} />} label="Início" onClick={() => setActiveTab('feed')} />
+          <NavButton active={activeTab === 'discovery'} icon={<Search size={22} />} label="Explorar" onClick={() => setActiveTab('discovery')} />
+          
           <div className="flex flex-col items-center justify-center p-2">
-              <div 
-                onClick={() => setActiveTab('record')}
-                className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 active:scale-95 transition-all cursor-pointer hover:bg-blue-500"
-              >
-                  <PlusSquare size={24} />
-              </div>
+            <div onClick={() => setActiveTab('record')} className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-95 transition-all cursor-pointer">
+              <PlusSquare size={24} />
+            </div>
           </div>
+
+          <NavButton active={activeTab === 'dashboard'} icon={<LayoutDashboard size={22} />} label="Painel" onClick={() => setActiveTab('dashboard')} />
+          
+          {/* Seção dinâmica do menu baseada no login */}
           <NavButton 
-            active={activeTab === 'dashboard'} 
-            icon={<LayoutDashboard size={22} />} 
-            label="Painel" 
-            onClick={() => setActiveTab('dashboard')} 
-          />
-          <NavButton 
-            active={activeTab === 'docs'} 
-            icon={<FileText size={22} />} 
-            label="Specs" 
-            onClick={() => setActiveTab('docs')} 
+            active={activeTab === 'me'} 
+            icon={session ? <User size={22} /> : <LogIn size={22} />} 
+            label={session ? "Perfil" : "Entrar"} 
+            onClick={() => setActiveTab('me')} 
           />
         </nav>
       )}
@@ -115,14 +183,9 @@ const App: React.FC = () => {
 };
 
 const NavButton: React.FC<{ active: boolean; icon: React.ReactNode; label: string; onClick: () => void }> = ({ active, icon, label, onClick }) => (
-  <button 
-    onClick={onClick}
-    className={`flex flex-col items-center justify-center space-y-0.5 w-16 transition-all ${active ? 'text-blue-600' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'}`}
-  >
-    <div className={`transition-transform duration-200 ${active ? 'scale-110' : 'scale-100'}`}>
-      {icon}
-    </div>
-    <span className={`text-[10px] font-bold tracking-tight transition-opacity ${active ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
+  <button onClick={onClick} className={`flex flex-col items-center justify-center space-y-0.5 w-16 transition-all ${active ? 'text-blue-600' : 'text-zinc-500'}`}>
+    {icon}
+    <span className="text-[10px] font-bold">{label}</span>
   </button>
 );
 
