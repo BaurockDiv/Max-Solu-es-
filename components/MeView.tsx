@@ -20,7 +20,9 @@ import {
   MapPin,
   Clock,
   Check,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck,
+  KeyRound
 } from 'lucide-react';
 import { Business, Category } from '../types';
 
@@ -49,6 +51,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
   const [isUploading, setIsUploading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetStatus, setResetStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
   const [formData, setFormData] = useState<any>({
     name: '',
@@ -87,6 +90,21 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
       });
     }
   }, [initialBusiness, activeView]);
+
+  const handlePasswordReset = async () => {
+    setResetStatus('loading');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(session.user.email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setResetStatus('success');
+      setTimeout(() => setResetStatus('idle'), 5000);
+    } catch (err) {
+      alert("Erro ao solicitar redefinição: " + (err as Error).message);
+      setResetStatus('idle');
+    }
+  };
 
   const toggleDay = (dayId: string) => {
     setFormData((prev: any) => {
@@ -177,164 +195,180 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
   };
 
   return (
-    <div className="h-full w-full relative bg-white dark:bg-black overflow-hidden flex flex-col">
+    <div className="flex-1 flex flex-col relative bg-white dark:bg-black overflow-hidden animate-gpu">
       {/* VIEW PRINCIPAL */}
       <div className={`flex-1 flex flex-col overflow-y-auto hide-scrollbar transition-all duration-300 ${activeView === 'edit-profile' ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
-        <div className="px-6 py-10 flex flex-col items-center text-center space-y-4 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-100 dark:border-zinc-900 rounded-b-[3rem]">
+        <div className="px-6 py-14 flex flex-col items-center text-center space-y-4 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-100 dark:border-zinc-900 rounded-b-[4rem] flex-shrink-0">
           <div className="relative">
-            <img src={initialBusiness?.logo || 'https://picsum.photos/200/200'} className="w-24 h-24 rounded-[2.5rem] object-cover shadow-2xl border-4 border-white dark:border-black" alt="Profile" />
-            <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white border-4 border-white dark:border-zinc-950">
-              <TrendingUp size={12} />
+            <div className="w-24 h-24 rounded-[2.5rem] p-1 bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-2xl">
+              <img src={initialBusiness?.logo || 'https://picsum.photos/200/200'} className="w-full h-full rounded-[2.3rem] object-cover border-[3px] border-white dark:border-black" alt="Profile" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white border-4 border-white dark:border-zinc-950">
+              <TrendingUp size={14} />
             </div>
           </div>
           <div className="space-y-1">
-            <h1 className="text-2xl font-black text-black dark:text-white uppercase tracking-tighter leading-tight">{initialBusiness?.name || "Membro BizStream"}</h1>
-            <p className="text-[9px] text-zinc-400 font-black uppercase tracking-[0.3em]">{session.user.email}</p>
+            <h1 className="text-2xl font-black text-black dark:text-white uppercase tracking-tighter italic leading-tight">{initialBusiness?.name || "Biz Professional"}</h1>
+            <p className="text-[10px] text-zinc-400 font-black uppercase tracking-[0.3em]">{session.user.email}</p>
           </div>
         </div>
 
-        <div className="p-6 space-y-6 pb-32">
+        <div className="p-6 space-y-6 pb-28">
           {!initialBusiness ? (
-            <div className="p-8 bg-blue-600/5 border-2 border-dashed border-blue-600/20 rounded-[2.5rem] text-center space-y-4">
-               <PlusCircle className="mx-auto text-blue-600" size={32} />
-               <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest leading-relaxed">Crie seu perfil profissional para começar.</p>
-               <button onClick={() => setActiveView('edit-profile')} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20">Configurar Agora</button>
+            <div className="p-12 bg-blue-600/5 border-2 border-dashed border-blue-600/20 rounded-[2.5rem] text-center space-y-5">
+               <PlusCircle className="mx-auto text-blue-600" size={44} />
+               <p className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.2em] leading-relaxed">Ative sua presença profissional na rede.</p>
+               <button onClick={() => setActiveView('edit-profile')} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all">Começar Agora</button>
             </div>
           ) : (
             <div className="space-y-4">
-              <button onClick={onOpenDashboard} className="w-full flex items-center justify-between p-6 bg-blue-600 text-white rounded-[2rem] shadow-xl shadow-blue-600/10 active:scale-95 transition-all">
-                <div className="flex items-center gap-4"><LayoutDashboard size={20} /><span className="text-[10px] font-black uppercase tracking-widest">Painel de Métricas</span></div>
-                <TrendingUp size={16} />
+              <button onClick={onOpenDashboard} className="w-full flex items-center justify-between p-6 bg-blue-600 text-white rounded-[2.4rem] shadow-xl shadow-blue-600/10 active:scale-[0.98] transition-all">
+                <div className="flex items-center gap-4"><LayoutDashboard size={22} /><span className="text-[11px] font-black uppercase tracking-widest">Painel de Métricas</span></div>
+                <TrendingUp size={18} />
               </button>
               
-              <div className="bg-zinc-50 dark:bg-zinc-950 rounded-[2rem] border border-zinc-100 dark:border-zinc-900 overflow-hidden shadow-sm">
-                 <button onClick={() => setActiveView('edit-profile')} className="w-full flex items-center justify-between p-5 hover:bg-zinc-100 dark:hover:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-900 transition-colors">
-                    <div className="flex items-center gap-4"><Settings size={20} className="text-blue-500"/><span className="text-[10px] font-black uppercase text-black dark:text-white tracking-tight">Ajustes Profissionais</span></div>
-                    <ChevronRight size={16} className="text-zinc-300"/>
+              <div className="bg-zinc-50 dark:bg-zinc-950 rounded-[2.4rem] border border-zinc-100 dark:border-zinc-900 overflow-hidden shadow-sm">
+                 <button onClick={() => setActiveView('edit-profile')} className="w-full flex items-center justify-between p-6 hover:bg-zinc-100 dark:hover:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-900 transition-colors">
+                    <div className="flex items-center gap-4"><Settings size={22} className="text-blue-500"/><span className="text-[11px] font-black uppercase text-black dark:text-white tracking-tight">Editar Negócio</span></div>
+                    <ChevronRight size={20} className="text-zinc-300"/>
                  </button>
-                 <div className="p-5 flex items-center justify-between">
-                    <div className="flex items-center gap-4">{theme === 'light' ? <Sun size={18} className="text-orange-500" /> : <Moon size={18} className="text-blue-500" />}<span className="text-[10px] font-black uppercase text-black dark:text-white">Modo Dark</span></div>
-                    <button onClick={() => onToggleTheme(theme === 'light' ? 'dark' : 'light')} className={`w-10 h-6 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-zinc-200'}`}><div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${theme === 'dark' ? 'left-5' : 'left-1'}`} /></button>
+                 
+                 {/* Nova Seção de Segurança */}
+                 <div className="p-6 flex flex-col gap-4 border-b border-zinc-100 dark:border-zinc-900">
+                    <div className="flex items-center gap-4"><ShieldCheck size={22} className="text-zinc-400"/><span className="text-[11px] font-black uppercase text-black dark:text-white tracking-tight">Segurança da Conta</span></div>
+                    <button 
+                      onClick={handlePasswordReset}
+                      disabled={resetStatus !== 'idle'}
+                      className={`w-full py-4 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-3 active:scale-95 ${resetStatus === 'success' ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-white dark:bg-black border-zinc-200 dark:border-zinc-800 text-zinc-500'}`}
+                    >
+                      {resetStatus === 'loading' ? <Loader2 size={16} className="animate-spin"/> : resetStatus === 'success' ? <Check size={16}/> : <KeyRound size={16}/>}
+                      {resetStatus === 'loading' ? 'Enviando...' : resetStatus === 'success' ? 'Link Enviado ao E-mail' : 'Redefinir Senha'}
+                    </button>
+                 </div>
+
+                 <div className="p-6 flex items-center justify-between">
+                    <div className="flex items-center gap-4">{theme === 'light' ? <Sun size={22} className="text-orange-500" /> : <Moon size={22} className="text-blue-500" />}<span className="text-[11px] font-black uppercase text-black dark:text-white">Tema Visual</span></div>
+                    <button onClick={() => onToggleTheme(theme === 'light' ? 'dark' : 'light')} className={`w-12 h-7 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-zinc-200'}`}><div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-sm ${theme === 'dark' ? 'left-6' : 'left-1'}`} /></button>
                  </div>
               </div>
 
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-950 rounded-[2rem] border border-zinc-100 dark:border-zinc-900 space-y-4">
-                <h3 className="text-[8px] font-black text-zinc-400 uppercase tracking-[0.3em] ml-2">Atalhos de Contato</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  <QuickContact icon={<MessageCircle size={16}/>} label="Whats" value={initialBusiness.whatsapp} />
-                  <QuickContact icon={<Phone size={16}/>} label="Fone" value={initialBusiness.phone} />
-                  <QuickContact icon={<Mail size={16}/>} label="Email" value={initialBusiness.email} />
+              <div className="p-6 bg-zinc-50 dark:bg-zinc-950 rounded-[2.4rem] border border-zinc-100 dark:border-zinc-900 space-y-5">
+                <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em] ml-2">Visão Rápida</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <QuickContact icon={<MessageCircle size={18}/>} label="Whats" value={initialBusiness.whatsapp} />
+                  <QuickContact icon={<Phone size={18}/>} label="Fone" value={initialBusiness.phone} />
+                  <QuickContact icon={<Mail size={18}/>} label="Email" value={initialBusiness.email} />
                 </div>
               </div>
             </div>
           )}
-          <button onClick={() => supabase.auth.signOut()} className="w-full p-5 bg-zinc-50 dark:bg-zinc-900 text-red-600 rounded-2xl font-black text-[9px] uppercase tracking-widest border border-zinc-100 dark:border-zinc-800 active:bg-red-50 transition-colors"><LogOut size={18} className="inline mr-2" /> Encerrar Sessão</button>
+          <button onClick={() => supabase.auth.signOut()} className="w-full p-6 bg-zinc-50 dark:bg-zinc-900 text-red-600 rounded-[2.2rem] font-black text-[10px] uppercase tracking-widest border border-zinc-100 dark:border-zinc-800 active:bg-red-50 transition-colors flex items-center justify-center gap-3"><LogOut size={20} /> Encerrar Sessão</button>
         </div>
       </div>
 
-      {/* VIEW DE EDIÇÃO (OVERLAY) */}
+      {/* VIEW DE EDIÇÃO */}
       {activeView === 'edit-profile' && (
-        <div className="absolute inset-0 bg-white dark:bg-black z-[100] flex flex-col animate-in slide-in-from-bottom duration-300">
-          <div className="flex items-center justify-between p-4 border-b border-zinc-100 dark:border-zinc-900 bg-white dark:bg-black shrink-0 relative z-10">
-            <button onClick={() => setActiveView('main')} className="text-zinc-500 w-9 h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center active:scale-90 transition-all"><X size={18} /></button>
-            <h2 className="text-[9px] font-black uppercase tracking-widest text-black dark:text-white text-center flex-1">Ajustes</h2>
-            <div className="w-9" />
+        <div className="absolute inset-0 bg-white dark:bg-black z-[100] flex flex-col animate-in slide-in-from-bottom duration-400">
+          <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-zinc-900 bg-white dark:bg-black shrink-0 relative z-10">
+            <button onClick={() => setActiveView('main')} className="text-zinc-500 w-11 h-11 rounded-2xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center active:scale-90 transition-all"><X size={22} /></button>
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-black dark:text-white text-center flex-1 italic">Setup Profissional</h2>
+            <div className="w-11" />
           </div>
           
-          <div className="flex-1 overflow-y-auto px-5 py-6 hide-scrollbar pb-32">
-            <div className="space-y-8">
-              <div className="flex flex-col items-center space-y-3">
+          <div className="flex-1 overflow-y-auto px-6 py-8 hide-scrollbar pb-32 smooth-scroll">
+            <div className="space-y-10">
+              <div className="flex flex-col items-center space-y-4">
                 <div className="relative cursor-pointer" onClick={() => !isUploading && fileInputRef.current?.click()}>
-                  <div className="w-24 h-24 rounded-[2.2rem] overflow-hidden border-2 border-blue-600/10 shadow-xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center">
+                  <div className="w-28 h-28 rounded-[2.8rem] overflow-hidden border-2 border-blue-600/20 shadow-2xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center">
                     {isUploading ? <Loader2 className="animate-spin text-blue-600" /> : <img src={formData.logo || 'https://picsum.photos/200/200'} className="w-full h-full object-cover" alt="Preview" />}
                   </div>
-                  <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white border-2 border-white dark:border-black shadow-lg"><Camera size={14} /></div>
+                  <div className="absolute -bottom-1 -right-1 w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white border-4 border-white dark:border-black shadow-lg"><Camera size={18} /></div>
                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleLogoChange} />
                 </div>
                 
                 {error && (
-                  <div className="bg-red-50 dark:bg-red-900/10 p-5 rounded-2xl border border-red-500/20 flex gap-3 items-center mx-1 animate-in shake duration-300">
-                    <AlertCircle className="text-red-500 shrink-0" size={20} />
-                    <p className="text-[9px] text-red-600 font-black uppercase leading-relaxed">{error}</p>
+                  <div className="bg-red-50 dark:bg-red-900/10 p-5 rounded-[1.5rem] border border-red-500/20 flex gap-4 items-center animate-in shake duration-300">
+                    <AlertCircle className="text-red-500 shrink-0" size={24} />
+                    <p className="text-[10px] text-red-600 font-black uppercase leading-tight">{error}</p>
                   </div>
                 )}
               </div>
 
               <form id="profile-form" onSubmit={handleSaveProfile} className="space-y-8">
-                <div className="space-y-4">
-                  <SectionHeader icon={<User size={12}/>} title="Identidade" />
-                  <InputGroup label="Nome do Negócio" value={formData.name} onChange={v => setFormData({...formData, name: v})} placeholder="Ex: Studio Biz" />
-                  <div className="space-y-1.5">
-                    <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-1">Categoria</label>
-                    <select className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-black text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as Category})}>
+                <div className="space-y-5">
+                  <SectionHeader icon={<User size={14}/>} title="Empresa" />
+                  <InputGroup label="Nome Fantasia" value={formData.name} onChange={v => setFormData({...formData, name: v})} placeholder="Ex: Studio Criativo" />
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Segmento</label>
+                    <select className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-[14px] font-bold text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as Category})}>
                         {Object.values(Category).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <SectionHeader icon={<MessageCircle size={12}/>} title="Contato Direto" />
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-5">
+                  <SectionHeader icon={<MessageCircle size={14}/>} title="Contatos" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <InputGroup 
-                      icon={<MessageCircle size={12}/>} 
+                      icon={<MessageCircle size={14}/>} 
                       label="WhatsApp" 
                       value={formData.whatsapp} 
                       onChange={v => setFormData({...formData, whatsapp: v})} 
                       placeholder="Somente Números" 
                     />
                     <InputGroup 
-                      icon={<Phone size={12}/>} 
+                      icon={<Phone size={14}/>} 
                       label="Telefone" 
                       value={formData.phone} 
                       onChange={v => setFormData({...formData, phone: v})} 
                       placeholder="Fixo/Celular" 
                     />
                   </div>
-                  <InputGroup icon={<Mail size={12}/>} label="E-mail Público" value={formData.email} onChange={v => setFormData({...formData, email: v})} placeholder="contato@voce.com" />
-                  <InputGroup icon={<MapPin size={12}/>} label="Localização" value={formData.location} onChange={v => setFormData({...formData, location: v})} placeholder="Cidade, UF" />
+                  <InputGroup icon={<Mail size={14}/>} label="E-mail" value={formData.email} onChange={v => setFormData({...formData, email: v})} placeholder="contato@empresa.com" />
+                  <InputGroup icon={<MapPin size={14}/>} label="Endereço/Cidade" value={formData.location} onChange={v => setFormData({...formData, location: v})} placeholder="Sua localização" />
                 </div>
 
-                <div className="space-y-4">
-                  <SectionHeader icon={<Clock size={12}/>} title="Atendimento" />
-                  <div className="space-y-2">
-                    <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-1">Dias da Semana</label>
-                    <div className="flex justify-between gap-1">
+                <div className="space-y-5">
+                  <SectionHeader icon={<Clock size={14}/>} title="Expediente" />
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Dias de Operação</label>
+                    <div className="flex justify-between gap-1.5">
                       {DAYS_OF_WEEK.map(day => (
                         <button
                           key={day.id}
                           type="button"
                           onClick={() => toggleDay(day.id)}
-                          className={`flex-1 h-9 rounded-full text-[10px] font-black transition-all flex items-center justify-center ${formData.selectedDays.includes(day.id) ? 'bg-blue-600 text-white shadow-md' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 border border-zinc-100 dark:border-zinc-800'}`}
+                          className={`flex-1 h-11 rounded-xl text-[11px] font-black transition-all flex items-center justify-center ${formData.selectedDays.includes(day.id) ? 'bg-blue-600 text-white shadow-lg' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 border border-zinc-100 dark:border-zinc-800'}`}
                         >
                           {day.label}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex gap-4">
                     <InputGroup label="Abre às" value={formData.openTime} onChange={v => setFormData({...formData, openTime: v})} type="time" />
                     <InputGroup label="Fecha às" value={formData.closeTime} onChange={v => setFormData({...formData, closeTime: v})} type="time" />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-1">Bio Profissional</label>
-                  <textarea className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-xl p-4 text-xs font-bold border border-zinc-100 dark:border-zinc-800 text-black dark:text-white h-24 resize-none outline-none focus:ring-1 focus:ring-blue-500" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} />
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Bio / Slogan</label>
+                  <textarea className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-5 text-[14px] font-medium border border-zinc-100 dark:border-zinc-800 text-black dark:text-white h-32 resize-none outline-none focus:ring-1 focus:ring-blue-500" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} />
                 </div>
               </form>
             </div>
           </div>
 
-          {/* Botão Floating Ultra-Slim Pill com Efeito Glass */}
-          <div className="absolute bottom-8 left-8 right-8 z-[110] pointer-events-none">
+          {/* Botão Flutuante Glass Pill */}
+          <div className="absolute bottom-10 left-8 right-8 z-[110] pointer-events-none">
             <button 
               form="profile-form"
               type="submit" 
               disabled={isSaving || isUploading} 
-              className={`w-full h-12 rounded-full font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-2 pointer-events-auto border border-white/20 backdrop-blur-md ${saveSuccess ? 'bg-green-600/90 text-white' : 'bg-blue-600/90 text-white'}`}
+              className={`w-full h-15 rounded-full font-black text-[11px] uppercase tracking-[0.2em] transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-3 pointer-events-auto border border-white/20 backdrop-blur-xl ${saveSuccess ? 'bg-green-600/90 text-white' : 'bg-blue-600/90 text-white'}`}
             >
-              {isSaving ? <Loader2 className="animate-spin" size={14}/> : saveSuccess ? <Check size={14}/> : null}
-              {isSaving ? 'Sincronizando...' : saveSuccess ? 'Perfil Fixado!' : 'Confirmar Ajustes'}
+              {isSaving ? <Loader2 className="animate-spin" size={16}/> : saveSuccess ? <Check size={16}/> : null}
+              {isSaving ? 'Salvando...' : saveSuccess ? 'Confirmado!' : 'Salvar Perfil'}
             </button>
           </div>
         </div>
@@ -344,29 +378,29 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
 };
 
 const SectionHeader: React.FC<{ icon: React.ReactNode; title: string }> = ({ icon, title }) => (
-  <div className="flex items-center gap-2 px-1 pb-1.5 border-b border-zinc-50 dark:border-zinc-900">
+  <div className="flex items-center gap-3 px-1 pb-2 border-b border-zinc-100 dark:border-zinc-900">
     <div className="text-blue-500">{icon}</div>
-    <h3 className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">{title}</h3>
+    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">{title}</h3>
   </div>
 );
 
 const QuickContact: React.FC<{ icon: React.ReactNode; label: string; value?: string }> = ({ icon, label, value }) => (
-  <div className={`p-4 rounded-2xl flex flex-col items-center gap-1 border border-zinc-100 dark:border-zinc-800 transition-opacity ${value ? 'opacity-100' : 'opacity-30'}`}>
+  <div className={`p-5 rounded-[1.8rem] flex flex-col items-center gap-2 border border-zinc-100 dark:border-zinc-800 transition-all ${value ? 'opacity-100 bg-white dark:bg-black shadow-sm' : 'opacity-20'}`}>
     <div className="text-blue-500">{icon}</div>
-    <span className="text-[7px] font-black uppercase text-zinc-400">{label}</span>
+    <span className="text-[8px] font-black uppercase text-zinc-400 tracking-tighter">{label}</span>
   </div>
 );
 
 const InputGroup: React.FC<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; icon?: React.ReactNode }> = ({ label, value, onChange, placeholder, type = "text", icon }) => (
-  <div className="space-y-1.5 flex-1">
-    <div className="flex items-center gap-1.5 ml-1">
+  <div className="space-y-2 flex-1">
+    <div className="flex items-center gap-2 ml-1">
       {icon && <div className="text-zinc-400">{icon}</div>}
-      <label className="text-[7px] font-black text-zinc-400 uppercase tracking-widest">{label}</label>
+      <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{label}</label>
     </div>
     <input 
       type={type} 
       placeholder={placeholder}
-      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-black text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-700" 
+      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-[14px] font-bold text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-700" 
       value={value} 
       onChange={e => onChange(e.target.value)} 
     />

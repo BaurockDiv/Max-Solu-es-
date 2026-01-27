@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, memo } from 'react';
 import { Heart, MessageCircle, Share2, ShoppingBag, CheckCircle2, X, Send, UserPlus, UserCheck, Loader2 } from 'lucide-react';
 import { MediaPost, Comment } from '../types';
 import { supabase } from '../lib/supabase';
@@ -17,13 +17,13 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowBu
         <div className="w-20 h-20 rounded-[2rem] bg-zinc-900 flex items-center justify-center text-zinc-700">
            <MessageCircle size={40} />
         </div>
-        <p className="text-zinc-500 font-black uppercase tracking-[0.2em] text-[10px] leading-relaxed">Nenhuma publicação na sua região.</p>
+        <p className="text-zinc-500 font-black uppercase tracking-[0.2em] text-[11px] leading-relaxed">Nenhuma publicação na sua região.</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar bg-black">
+    <div className="h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar bg-black smooth-scroll">
       {posts.map((post) => (
         <FeedItem key={post.id} post={post} onProfileClick={onProfileClick} hideFollowButton={hideFollowButton} />
       ))}
@@ -31,7 +31,7 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowBu
   );
 };
 
-const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void; hideFollowButton?: boolean }> = ({ post, onProfileClick, hideFollowButton }) => {
+const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void; hideFollowButton?: boolean }> = memo(({ post, onProfileClick, hideFollowButton }) => {
   const business = post.business;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -48,13 +48,18 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
     checkInitialStatus();
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) {
-        if (videoRef.current) videoRef.current.play().catch(() => {});
-        setIsPlaying(true);
+        if (videoRef.current) {
+          videoRef.current.play().catch(() => {});
+          setIsPlaying(true);
+        }
       } else {
-        if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0; }
+        if (videoRef.current) { 
+          videoRef.current.pause(); 
+          videoRef.current.currentTime = 0; 
+        }
         setIsPlaying(false);
       }
-    }, { threshold: 0.6 });
+    }, { threshold: 0.5 });
     if (videoRef.current) observer.observe(videoRef.current);
     return () => observer.disconnect();
   }, [post.id]);
@@ -75,25 +80,20 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
     const previousLiked = liked;
     const previousCount = likesCount;
 
-    // UI Otimista
     setLiked(!liked);
     setLikesCount(prev => !liked ? prev + 1 : prev - 1);
 
     try {
       if (!liked) {
-        const { error } = await supabase.from('post_likes').insert({ post_id: post.id, user_id: session.user.id });
-        if (error) throw error;
+        await supabase.from('post_likes').insert({ post_id: post.id, user_id: session.user.id });
         await supabase.rpc('increment_likes', { row_id: post.id });
       } else {
-        const { error } = await supabase.from('post_likes').delete().match({ post_id: post.id, user_id: session.user.id });
-        if (error) throw error;
+        await supabase.from('post_likes').delete().match({ post_id: post.id, user_id: session.user.id });
         await supabase.rpc('decrement_likes', { row_id: post.id });
       }
     } catch (err) {
-      // Rollback em caso de erro na API
       setLiked(previousLiked);
       setLikesCount(previousCount);
-      console.error("Erro ao curtir:", err);
     }
   };
 
@@ -119,13 +119,12 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
 
     setIsSubmittingComment(true);
     try {
-      const { error } = await supabase.from('comments').insert({ 
+      await supabase.from('comments').insert({ 
         post_id: post.id, 
         text: newCommentText, 
         user_id: session.user.id, 
         user_email: session.user.email 
       });
-      if (error) throw error;
       setNewCommentText('');
       await loadComments();
     } catch (err: any) {
@@ -138,13 +137,13 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
   if (!business) return null;
 
   return (
-    <div className="h-full w-full snap-start relative flex items-center justify-center bg-zinc-950 overflow-hidden">
+    <div className="h-full w-full snap-start relative flex items-center justify-center bg-black overflow-hidden animate-gpu">
       {post.type === 'video' ? (
         <>
           <div className={`absolute inset-0 z-0 transition-opacity duration-500 ${isReady ? 'opacity-0' : 'opacity-100'}`}>
-            <img src={post.thumbnail || ''} className="h-full w-full object-cover filter blur-2xl scale-125" alt="Loading" />
+            <img src={post.thumbnail || ''} className="h-full w-full object-cover filter blur-3xl opacity-50" alt="Loading" />
             <div className="absolute inset-0 flex items-center justify-center">
-               <Loader2 className="animate-spin text-white/20" size={32} />
+               <Loader2 className="animate-spin text-white/10" size={32} />
             </div>
           </div>
           <video 
@@ -159,88 +158,88 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
         <img src={post.url} className="h-full w-full object-cover" alt={post.caption} />
       )}
 
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/95 pointer-events-none z-20" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/90 pointer-events-none z-20" />
 
-      {/* Interface de Texto e Autor */}
-      <div className="absolute bottom-12 left-6 right-16 text-white space-y-5 z-30">
-        <div className="flex items-center space-x-4">
+      {/* Interface de Texto */}
+      <div className="absolute bottom-10 left-5 right-16 text-white space-y-4 z-30 pointer-events-none">
+        <div className="flex items-center space-x-3 pointer-events-auto">
           <div className="relative" onClick={() => onProfileClick(business.id)}>
-            <div className="w-14 h-14 rounded-[1.8rem] p-0.5 bg-gradient-to-tr from-blue-600 to-indigo-500">
-              <img src={business.logo || 'https://picsum.photos/200/200'} className="w-full h-full rounded-[1.6rem] border-2 border-black object-cover" alt={business.name} />
+            <div className="w-12 h-12 rounded-[1.6rem] p-0.5 bg-gradient-to-tr from-blue-600 to-indigo-500">
+              <img src={business.logo || 'https://picsum.photos/200/200'} className="w-full h-full rounded-[1.4rem] border-2 border-black object-cover" alt={business.name} />
             </div>
             {!hideFollowButton && (
-              <button onClick={handleFollow} className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-lg flex items-center justify-center border-2 border-black shadow-lg transition-colors ${isFollowing ? 'bg-zinc-800' : 'bg-blue-600'}`}>
-                {isFollowing ? <UserCheck size={12} /> : <UserPlus size={12} />}
+              <button onClick={handleFollow} className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-lg flex items-center justify-center border border-black shadow-lg transition-all ${isFollowing ? 'bg-zinc-800' : 'bg-blue-600 active:scale-90'}`}>
+                {isFollowing ? <UserCheck size={10} /> : <UserPlus size={10} />}
               </button>
             )}
           </div>
           <div onClick={() => onProfileClick(business.id)} className="flex flex-col cursor-pointer">
             <div className="flex items-center space-x-1.5">
-              <span className="font-black text-[11px] uppercase tracking-widest">{business.name}</span>
-              {business.verified && <CheckCircle2 size={14} className="text-blue-400 fill-blue-400/10" />}
+              <span className="font-black text-[12px] uppercase tracking-widest">{business.name}</span>
+              {business.verified && <CheckCircle2 size={12} className="text-blue-400 fill-blue-400/10" />}
             </div>
-            <span className="text-[8px] text-zinc-400 font-black uppercase tracking-[0.2em]">{business.category}</span>
+            <span className="text-[9px] text-zinc-400 font-black uppercase tracking-[0.2em]">{business.category}</span>
           </div>
         </div>
-        <p className="text-[14px] font-medium leading-snug opacity-95 line-clamp-2 max-w-[85%]">{post.caption}</p>
+        <p className="text-[13px] font-medium leading-relaxed opacity-90 line-clamp-3 max-w-[90%]">{post.caption}</p>
         
         {post.cta_text && (
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-xl border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white shadow-xl active:scale-95 transition-all">
+          <button className="pointer-events-auto flex items-center gap-2 px-5 py-3 bg-white/10 backdrop-blur-2xl border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl active:scale-95 transition-all">
             <ShoppingBag size={14} /> {post.cta_text}
           </button>
         )}
       </div>
 
-      {/* Botões de Ação Laterais */}
-      <div className="absolute right-4 bottom-28 flex flex-col items-center space-y-7 text-white z-30">
+      {/* Botões de Ação */}
+      <div className="absolute right-3 bottom-24 flex flex-col items-center space-y-6 text-white z-30">
         <ActionButton 
           active={liked} 
           onClick={handleLike} 
-          icon={<Heart size={28} className={`transition-all duration-300 ${liked ? "fill-red-500 text-red-500 scale-125" : "text-white"}`} />} 
+          icon={<Heart size={26} className={`transition-all duration-300 ${liked ? "fill-red-500 text-red-500 scale-125" : "text-white"}`} />} 
           count={likesCount} 
         />
-        <ActionButton icon={<MessageCircle size={28} />} count={comments.length > 0 ? comments.length : "Comentar"} onClick={() => { setShowComments(true); loadComments(); }} />
-        <ActionButton icon={<Share2 size={28} />} count="Compartilhar" onClick={() => navigator.share({ url: post.url }).catch(() => {})} />
+        <ActionButton icon={<MessageCircle size={26} />} count={comments.length > 0 ? comments.length : "Feed"} onClick={() => { setShowComments(true); loadComments(); }} />
+        <ActionButton icon={<Share2 size={26} />} count="Link" onClick={() => navigator.share({ url: post.url }).catch(() => {})} />
       </div>
 
       {/* Modal de Comentários */}
       {showComments && (
         <div className="absolute inset-0 z-[100] animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setShowComments(false)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-zinc-900 rounded-t-[3rem] h-[75vh] flex flex-col animate-in slide-in-from-bottom duration-500 border-t border-white/5">
-             <div className="p-6 flex items-center justify-between border-b border-white/5">
-                <div className="space-y-1">
-                   <span className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Engajamento</span>
-                   <p className="text-xs font-bold text-white uppercase">{comments.length} Comentários</p>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowComments(false)} />
+          <div className="absolute bottom-0 left-0 right-0 bg-zinc-900 rounded-t-[2.5rem] h-[70vh] flex flex-col animate-in slide-in-from-bottom duration-500 border-t border-white/5 overflow-hidden">
+             <div className="p-5 flex items-center justify-between border-b border-white/5">
+                <div className="space-y-0.5">
+                   <span className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-500">Publicação</span>
+                   <p className="text-[11px] font-black text-white uppercase tracking-tighter">{comments.length} Comentários</p>
                 </div>
-                <button onClick={() => setShowComments(false)} className="w-11 h-11 rounded-2xl bg-zinc-800 flex items-center justify-center active:scale-90 transition-all"><X size={20}/></button>
+                <button onClick={() => setShowComments(false)} className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center active:scale-90 transition-all text-zinc-400"><X size={20}/></button>
              </div>
              
-             <div className="flex-1 overflow-y-auto p-6 space-y-7 hide-scrollbar">
+             <div className="flex-1 overflow-y-auto p-5 space-y-6 hide-scrollbar smooth-scroll">
                 {comments.length > 0 ? comments.map(c => (
-                  <div key={c.id} className="flex space-x-4 animate-in slide-in-from-left duration-300">
-                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-white/5 flex items-center justify-center text-[10px] font-black text-blue-500">{c.user_email?.[0]?.toUpperCase()}</div>
-                    <div className="space-y-1.5 flex-1">
+                  <div key={c.id} className="flex space-x-3 animate-in slide-in-from-left duration-300">
+                    <div className="w-9 h-9 rounded-xl bg-zinc-800 border border-white/5 flex items-center justify-center text-[11px] font-black text-blue-500 flex-shrink-0">{c.user_email?.[0]?.toUpperCase()}</div>
+                    <div className="space-y-1 flex-1">
                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase tracking-tight text-zinc-200">{c.user_email?.split('@')[0]}</span>
-                          <span className="text-[8px] font-black text-zinc-600 uppercase">Agora</span>
+                          <span className="text-[10px] font-black uppercase text-zinc-300">{c.user_email?.split('@')[0]}</span>
+                          <span className="text-[8px] font-bold text-zinc-600 uppercase">Agora</span>
                        </div>
-                       <p className="text-sm text-zinc-400 font-medium leading-relaxed">{c.text}</p>
+                       <p className="text-[13px] text-zinc-400 font-medium leading-normal">{c.text}</p>
                     </div>
                   </div>
                 )) : (
-                  <div className="h-full flex flex-col items-center justify-center opacity-10 py-20">
-                    <MessageCircle size={60} />
-                    <p className="text-[11px] font-black uppercase mt-4 tracking-widest">Inicie a conversa</p>
+                  <div className="h-full flex flex-col items-center justify-center opacity-10 py-10">
+                    <MessageCircle size={48} />
+                    <p className="text-[10px] font-black uppercase mt-4 tracking-widest">Seja o primeiro a comentar</p>
                   </div>
                 )}
              </div>
 
-             <form onSubmit={handleSendComment} className="p-6 bg-zinc-950 border-t border-white/5 flex items-center gap-4 safe-area-bottom">
+             <form onSubmit={handleSendComment} className="p-5 bg-zinc-950 border-t border-white/5 flex items-center gap-3 safe-area-bottom">
                 <input 
                   type="text" 
-                  placeholder="Deixe seu feedback profissional..." 
-                  className="flex-1 bg-zinc-900 rounded-2xl py-4 px-6 text-sm text-white focus:ring-2 focus:ring-blue-600 outline-none border-none transition-all placeholder:text-zinc-600" 
+                  placeholder="Escreva algo..." 
+                  className="flex-1 bg-zinc-900 rounded-xl py-3.5 px-5 text-[14px] text-white focus:ring-1 focus:ring-blue-600 outline-none border-none placeholder:text-zinc-600" 
                   value={newCommentText} 
                   onChange={(e) => setNewCommentText(e.target.value)} 
                   disabled={isSubmittingComment}
@@ -248,9 +247,9 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
                 <button 
                   type="submit" 
                   disabled={isSubmittingComment || !newCommentText.trim()}
-                  className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20 active:scale-90 transition-all disabled:opacity-50"
+                  className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg active:scale-90 transition-all disabled:opacity-50"
                 >
-                  {isSubmittingComment ? <Loader2 className="animate-spin" size={18} /> : <Send size={20} />}
+                  {isSubmittingComment ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
                 </button>
              </form>
           </div>
@@ -258,15 +257,15 @@ const FeedItem: React.FC<{ post: MediaPost; onProfileClick: (id: string) => void
       )}
     </div>
   );
-};
+});
 
 const ActionButton: React.FC<{ icon: React.ReactNode; count: string | number; active?: boolean; onClick?: () => void }> = ({ icon, count, active, onClick }) => (
-  <div className="flex flex-col items-center space-y-1.5" onClick={onClick}>
-    <div className={`w-15 h-15 flex items-center justify-center rounded-[1.6rem] border transition-all active:scale-95 ${active ? 'bg-white/10 border-white/20 shadow-lg' : 'bg-black/40 border-white/10'}`}>
+  <button className="flex flex-col items-center space-y-1.5 w-12" onClick={onClick}>
+    <div className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all active:scale-90 ${active ? 'bg-white/10 shadow-lg' : 'bg-black/20'}`}>
        {icon}
     </div>
-    <span className="text-[9px] font-black uppercase tracking-tighter opacity-80">{count}</span>
-  </div>
+    <span className="text-[10px] font-black uppercase tracking-tighter opacity-70 truncate w-full text-center">{count}</span>
+  </button>
 );
 
 export default FeedView;

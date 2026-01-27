@@ -141,21 +141,23 @@ const App: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-black text-blue-500 font-black tracking-[0.5em] animate-pulse">BIZSTREAM</div>;
+  if (loading) return <div className="h-[100dvh] flex items-center justify-center bg-black text-blue-500 font-black tracking-[0.5em] animate-pulse">BIZSTREAM</div>;
 
   return (
-    <div className={`mobile-frame transition-colors duration-500 ${theme === 'dark' ? 'dark bg-black text-white' : 'bg-white text-zinc-950'} flex flex-col h-screen overflow-hidden`}>
-      <main className="flex-1 overflow-y-auto hide-scrollbar relative z-0">{renderContent()}</main>
+    <div className={`mobile-frame animate-gpu ${theme === 'dark' ? 'dark bg-black text-white' : 'bg-white text-zinc-950'}`}>
+      <main className="flex-1 overflow-hidden relative z-0 flex flex-col">
+        {renderContent()}
+      </main>
       
       {errorModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
-          <div className="bg-white dark:bg-zinc-900 w-full rounded-[2.5rem] p-8 shadow-2xl border border-red-500/20 animate-in zoom-in duration-300">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-[340px] rounded-[2.5rem] p-8 shadow-2xl border border-red-500/20 animate-in zoom-in duration-300">
              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 ${errorModal.isSql ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
                 {errorModal.isSql ? <Database size={32} /> : <AlertTriangle size={32} />}
              </div>
              <h3 className="text-xl font-black uppercase mb-2 tracking-tight">{errorModal.title}</h3>
-             <p className="text-zinc-500 text-xs leading-relaxed mb-8">{errorModal.msg}</p>
-             <button onClick={() => setErrorModal(null)} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
+             <p className="text-zinc-500 text-[11px] leading-relaxed mb-8 font-medium">{errorModal.msg}</p>
+             <button onClick={() => setErrorModal(null)} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
                 <X size={16} /> Entendi
              </button>
           </div>
@@ -163,12 +165,12 @@ const App: React.FC = () => {
       )}
 
       {activeTab !== 'record' && (
-        <nav className={`h-[84px] border-t shrink-0 ${theme === 'dark' ? 'border-zinc-900 bg-black/95' : 'border-zinc-100 bg-white/95'} backdrop-blur-md flex items-center justify-around px-6 z-[150] safe-area-bottom sticky bottom-0`}>
-          <NavButton active={activeTab === 'feed'} icon={<Home size={24} />} label="Início" onClick={() => setActiveTab('feed')} theme={theme} />
-          <NavButton active={activeTab === 'discovery'} icon={<Search size={24} />} label="Busca" onClick={() => setActiveTab('discovery')} theme={theme} />
-          <div onClick={() => setActiveTab('record')} className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all cursor-pointer"><PlusSquare size={26} /></div>
-          <NavButton active={activeTab === 'following'} icon={<Users size={24} />} label="Rede" onClick={() => setActiveTab('following')} theme={theme} />
-          <NavButton active={activeTab === 'me'} icon={session ? <User size={24} /> : <LogIn size={24} />} label="Perfil" onClick={() => setActiveTab('me')} theme={theme} />
+        <nav className={`h-[84px] border-t shrink-0 ${theme === 'dark' ? 'border-zinc-900 bg-black/95' : 'border-zinc-100 bg-white/95'} backdrop-blur-md flex items-center justify-around px-2 z-[150] safe-area-bottom sticky bottom-0`}>
+          <NavButton active={activeTab === 'feed'} icon={<Home size={22} />} label="Início" onClick={() => setActiveTab('feed')} theme={theme} />
+          <NavButton active={activeTab === 'discovery'} icon={<Search size={22} />} label="Busca" onClick={() => setActiveTab('discovery')} theme={theme} />
+          <div onClick={() => setActiveTab('record')} className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all cursor-pointer relative -top-2"><PlusSquare size={24} /></div>
+          <NavButton active={activeTab === 'following'} icon={<Users size={22} />} label="Rede" onClick={() => setActiveTab('following')} theme={theme} />
+          <NavButton active={activeTab === 'me'} icon={session ? <User size={22} /> : <LogIn size={22} />} label="Perfil" onClick={() => setActiveTab('me')} theme={theme} />
         </nav>
       )}
     </div>
@@ -176,9 +178,11 @@ const App: React.FC = () => {
 };
 
 const NavButton = ({ active, icon, label, onClick, theme }: any) => (
-  <button onClick={onClick} className={`flex flex-col items-center gap-1 w-12 transition-all ${active ? 'text-blue-600' : theme === 'dark' ? 'text-zinc-700' : 'text-zinc-400'}`}>
-    {icon}
-    <span className="text-[7px] font-black uppercase tracking-widest">{label}</span>
+  <button onClick={onClick} className={`flex flex-col items-center justify-center gap-1.5 w-14 h-14 transition-all duration-300 ${active ? 'text-blue-600' : theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
+    <div className={`transition-transform duration-300 ${active ? 'scale-110' : 'scale-100'}`}>
+        {icon}
+    </div>
+    <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${active ? 'opacity-100' : 'opacity-60'}`}>{label}</span>
   </button>
 );
 
