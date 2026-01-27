@@ -8,11 +8,47 @@ interface FeedViewProps {
   posts: MediaPost[];
   onProfileClick: (businessId: string) => void;
   hideFollowButton?: boolean;
+  onRefresh?: () => Promise<void>;
 }
 
-const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowButton }) => {
+const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowButton, onRefresh }) => {
   const [isGlobalMuted, setIsGlobalMuted] = useState(true);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullDist, setPullDist] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startY = useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (containerRef.current && containerRef.current.scrollTop === 0) {
+      startY.current = e.touches[0].pageY;
+    } else {
+      startY.current = 0;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (startY.current === 0 || refreshing) return;
+    const dist = e.touches[0].pageY - startY.current;
+    if (dist > 0 && dist < 120) {
+      setPullDist(dist);
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (pullDist > 70 && onRefresh && !refreshing) {
+      setRefreshing(true);
+      setPullDist(40);
+      await onRefresh();
+      setTimeout(() => {
+        setRefreshing(false);
+        setPullDist(0);
+      }, 500);
+    } else {
+      setPullDist(0);
+    }
+    startY.current = 0;
+  };
 
   // Se não houver posts
   if (posts.length === 0) return (
@@ -21,25 +57,46 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowBu
         <LayoutGrid size={40} />
       </div>
       <p className="text-zinc-400 dark:text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px]">Sem novidades na região</p>
+      {onRefresh && (
+        <button onClick={onRefresh} className="text-blue-600 text-[10px] font-black uppercase tracking-widest mt-4">Tentar Novamente</button>
+      )}
     </div>
   );
 
   return (
-    <div className="h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar bg-black relative">
-      {posts.map((post) => (
-        <FeedItem
-          key={post.id}
-          post={post}
-          onProfileClick={onProfileClick}
-          hideFollowButton={hideFollowButton}
-          isGlobalMuted={isGlobalMuted}
-          hasInteracted={hasInteracted}
-          onMuteToggle={() => {
-            setIsGlobalMuted(!isGlobalMuted);
-            setHasInteracted(true);
-          }}
-        />
-      ))}
+    <div
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar bg-black relative"
+    >
+      {/* Indicador de Refresh */}
+      <div
+        className="absolute top-0 left-0 right-0 flex items-center justify-center z-50 pointer-events-none transition-transform duration-300"
+        style={{ transform: `translateY(${pullDist}px)`, opacity: pullDist > 10 ? 1 : 0 }}
+      >
+        <div className="bg-white dark:bg-zinc-900 w-10 h-10 rounded-full shadow-xl flex items-center justify-center border border-zinc-200 dark:border-zinc-800">
+          <div className={`w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full ${refreshing ? 'animate-spin' : ''}`} style={{ transform: `rotate(${pullDist * 2}deg)` }} />
+        </div>
+      </div>
+
+      <div className="transition-transform duration-300" style={{ transform: `translateY(${pullDist}px)` }}>
+        {posts.map((post) => (
+          <FeedItem
+            key={post.id}
+            post={post}
+            onProfileClick={onProfileClick}
+            hideFollowButton={hideFollowButton}
+            isGlobalMuted={isGlobalMuted}
+            hasInteracted={hasInteracted}
+            onMuteToggle={() => {
+              setIsGlobalMuted(!isGlobalMuted);
+              setHasInteracted(true);
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 };

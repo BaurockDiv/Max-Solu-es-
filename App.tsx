@@ -67,9 +67,11 @@ const App: React.FC = () => {
   };
 
   const fetchData = async () => {
-    const { data, error } = await supabase.from('posts').select('*, business:businesses(*)').order('created_at', { ascending: false }).limit(20);
+    const { data, error } = await supabase.from('posts').select('*, business:businesses(*)').order('created_at', { ascending: false }).limit(40);
     if (!error && data) {
-      setAllPosts(data.map((p: any) => ({ ...p, businessId: p.business_id, url: p.media_url, thumbnail: p.thumbnail_url, business: p.business })) as any);
+      // Shuffling para dar sensação de novidade
+      const shuffled = [...data].sort(() => Math.random() - 0.5);
+      setAllPosts(shuffled.map((p: any) => ({ ...p, businessId: p.business_id, url: p.media_url, thumbnail: p.thumbnail_url, business: p.business })) as any);
     }
   };
 
@@ -156,7 +158,7 @@ const App: React.FC = () => {
       return <AuthView onBack={() => setActiveTab('feed')} />;
     }
     switch (activeTab) {
-      case 'feed': return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} />;
+      case 'feed': return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} onRefresh={fetchData} />;
       case 'discovery': return <DiscoveryView onBusinessClick={(id) => openProfile(id, 'discovery')} />;
       case 'following': return <FollowingView onProfileClick={(id) => openProfile(id, 'following')} />;
       case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} />;
@@ -218,7 +220,19 @@ const App: React.FC = () => {
 
       <nav className={`h-[84px] min-h-[84px] max-h-[84px] border-t shrink-0 ${theme === 'dark' ? 'border-zinc-900 bg-black/95' : 'border-zinc-100 bg-white/95'} backdrop-blur-md grid grid-cols-5 items-start pt-3 w-full z-[150] safe-area-bottom relative`}>
         <div className="flex justify-center items-center w-full">
-          <NavButton active={activeTab === 'feed'} icon={<Home size={22} />} label="Início" onClick={() => { if (activeTab === 'feed') { fetchData(); } else { setActiveTab('feed'); } }} theme={theme} />
+          <NavButton
+            active={activeTab === 'feed'}
+            icon={<Home size={22} />}
+            label="Início"
+            onClick={async () => {
+              if (activeTab === 'feed') {
+                fetchData();
+              } else {
+                setActiveTab('feed');
+              }
+            }}
+            theme={theme}
+          />
         </div>
         <div className="flex justify-center items-center w-full">
           <NavButton active={activeTab === 'discovery'} icon={<Search size={22} />} label="Busca" onClick={() => setActiveTab('discovery')} theme={theme} />
