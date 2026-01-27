@@ -41,21 +41,21 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     useEffect(() => {
         loadConversations();
 
-        // Real-time for new messages
         const messageChannel = supabase
             .channel('public:messages')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-                if (activeConv && payload.new.conversation_id === activeConv.id) {
-                    setMessages(prev => [...prev, payload.new as Message]);
+                if ((activeConv && payload.new.conversation_id === activeConv.id) ||
+                    (ghostChat && payload.new.sender_id === ghostChat.participant_2)) {
+                    loadMessages(payload.new.conversation_id);
                 }
-                loadConversations(); // Refresh last messages in list
+                loadConversations();
             })
             .subscribe();
 
         return () => {
             supabase.removeChannel(messageChannel);
         };
-    }, [activeConv]);
+    }, [initialBizId]); // Depend apenas do roteamento inicial
 
     useEffect(() => {
         if (activeConv) {
@@ -96,18 +96,24 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
             setConversations(formatted);
 
-            // Auto-select conversation if initialBizId is provided
+            // AUTO-OPEN LOGIC
             if (initialBizId) {
-                const found = formatted.find(c =>
+                const existing = formatted.find(c =>
                     c.participant_1 === initialBizId ||
                     c.participant_2 === initialBizId
                 );
 
-                if (found) {
-                    setActiveConv(found);
+                if (existing) {
+                    setActiveConv(existing);
+                    setGhostChat(null);
                 } else {
-                    // Chat Fantasma: Busca info do profissional para mostrar no header enquanto não há mensagens
-                    const { data: biz } = await supabase.from('businesses').select('name, logo').eq('owner_id', initialBizId).single();
+                    // Se não existe, busca os dados da empresa para o Ghost Chat
+                    const { data: biz } = await supabase
+                        .from('businesses')
+                        .select('name, logo, owner_id')
+                        .eq('owner_id', initialBizId)
+                        .maybeSingle();
+
                     if (biz) {
                         setGhostChat({
                             id: 'ghost',
@@ -116,11 +122,20 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                             participant_2: initialBizId,
                             status: 'pending'
                         });
+                    } else {
+                        // Fallback caso a query de business falhe ou demore
+                        setGhostChat({
+                            id: 'ghost',
+                            other_participant: { name: 'Profissional' },
+                            participant_1: session.user.id,
+                            participant_2: initialBizId,
+                            status: 'pending'
+                        });
                     }
                 }
             }
         } catch (err) {
-            console.error("Error loading chats:", err);
+            console.error("Chat Load Error:", err);
         } finally {
             setLoading(false);
         }
