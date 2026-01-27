@@ -160,7 +160,7 @@ const App: React.FC = () => {
   if (loading) return <div className="h-[100dvh] flex items-center justify-center bg-black text-blue-500 font-black tracking-[0.5em] animate-pulse">MAX COMPANY</div>;
 
   return (
-    <div className={`mobile-frame animate-gpu dark:bg-black bg-white transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}>
+    <div className={`mobile-frame animate-gpu bg-white dark:bg-black text-zinc-950 dark:text-white transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}>
       <main className="flex-1 overflow-hidden relative z-0 flex flex-col">
         {renderContent()}
       </main>
@@ -194,11 +194,11 @@ const App: React.FC = () => {
 };
 
 const NavButton = ({ active, icon, label, onClick, theme }: any) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center gap-1.5 w-14 h-14 transition-all duration-300 ${active ? 'text-blue-600' : theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
+  <button onClick={onClick} className={`flex flex-col items-center justify-center gap-1.5 w-14 h-14 transition-all duration-300 ${active ? 'text-blue-600' : theme === 'dark' ? 'text-zinc-600' : 'text-zinc-500'}`}>
     <div className={`transition-transform duration-300 ${active ? 'scale-110' : 'scale-100'}`}>
       {icon}
     </div>
-    <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${active ? 'opacity-100' : 'opacity-60'}`}>{label}</span>
+    <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${active ? 'opacity-100' : 'opacity-80'}`}>{label}</span>
   </button>
 );
 

@@ -217,7 +217,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
     <div className="flex-1 flex flex-col relative bg-white dark:bg-black overflow-hidden animate-gpu">
       {/* VIEW PRINCIPAL */}
       <div className={`flex-1 flex flex-col overflow-y-auto hide-scrollbar transition-all duration-300 ${activeView === 'edit-profile' ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
-        <div className="px-6 py-14 flex flex-col items-center text-center space-y-4 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 rounded-b-[4rem] flex-shrink-0">
+        <div className="px-6 py-14 flex flex-col items-center text-center space-y-4 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-300 dark:border-zinc-800 rounded-b-[4rem] flex-shrink-0">
           <div className="relative">
             <div className="w-24 h-24 rounded-[2.5rem] p-1 bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-2xl">
               <img src={initialBusiness?.logo || 'https://picsum.photos/200/200'} className="w-full h-full rounded-[2.3rem] object-cover border-[3px] border-white dark:border-black" alt="Profile" />
@@ -227,8 +227,8 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
             </div>
           </div>
           <div className="space-y-1">
-            <h1 className="text-2xl font-black text-black dark:text-white uppercase tracking-tighter italic leading-tight">{initialBusiness?.name || "Max Professional"}</h1>
-            <p className="text-[10px] text-zinc-400 font-black uppercase tracking-[0.3em]">{session.user.email}</p>
+            <h1 className="text-2xl font-black text-zinc-950 dark:text-white uppercase tracking-tighter italic leading-tight">{initialBusiness?.name || "Max Professional"}</h1>
+            <p className="text-[10px] text-zinc-600 dark:text-zinc-400 font-black uppercase tracking-[0.3em]">{session.user.email}</p>
           </div>
         </div>
 
@@ -236,7 +236,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
           {!initialBusiness ? (
             <div className="p-12 bg-blue-600/5 border-2 border-dashed border-blue-600/20 rounded-[2.5rem] text-center space-y-5">
               <PlusCircle className="mx-auto text-blue-600" size={44} />
-              <p className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.2em] leading-relaxed">Ative sua presença profissional na rede.</p>
+              <p className="text-[11px] font-black uppercase text-zinc-600 tracking-[0.2em] leading-relaxed">Ative sua presença profissional na rede.</p>
               <button onClick={() => setActiveView('edit-profile')} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all">Começar Agora</button>
             </div>
           ) : (
@@ -246,20 +246,20 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
                 <TrendingUp size={18} />
               </button>
 
-              <div className="bg-zinc-50 dark:bg-zinc-900 rounded-[2.4rem] border border-zinc-100 dark:border-zinc-800 overflow-hidden shadow-sm">
-                <button onClick={() => setActiveView('edit-profile')} className="w-full flex items-center justify-between p-6 hover:bg-zinc-100 dark:hover:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-800 transition-colors">
-                  <div className="flex items-center gap-4"><Settings size={22} className="text-blue-500" /><span className="text-[11px] font-black uppercase text-black dark:text-white tracking-tight">Editar Negócio</span></div>
-                  <ChevronRight size={20} className="text-zinc-300" />
+              <div className="bg-zinc-100 dark:bg-zinc-900 rounded-[2.4rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+                <button onClick={() => setActiveView('edit-profile')} className="w-full flex items-center justify-between p-6 hover:bg-zinc-200 dark:hover:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-800 transition-colors">
+                  <div className="flex items-center gap-4"><Settings size={22} className="text-blue-600" /><span className="text-[11px] font-black uppercase text-zinc-950 dark:text-white tracking-tight">Editar Negócio</span></div>
+                  <ChevronRight size={20} className="text-zinc-400" />
                 </button>
 
                 {/* Seção de Segurança Atualizada - Alteração Direta */}
-                <div className="p-6 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
                   <button
                     onClick={() => setShowPassForm(!showPassForm)}
                     className="w-full flex items-center justify-between transition-all"
                   >
-                    <div className="flex items-center gap-4"><ShieldCheck size={22} className="text-zinc-400" /><span className="text-[11px] font-black uppercase text-black dark:text-white tracking-tight">Segurança & Senha</span></div>
-                    <ChevronDown size={18} className={`text-zinc-300 transition-transform duration-300 ${showPassForm ? 'rotate-180' : ''}`} />
+                    <div className="flex items-center gap-4"><ShieldCheck size={22} className="text-zinc-600" /><span className="text-[11px] font-black uppercase text-zinc-950 dark:text-white tracking-tight">Segurança & Senha</span></div>
+                    <ChevronDown size={18} className={`text-zinc-400 transition-transform duration-300 ${showPassForm ? 'rotate-180' : ''}`} />
                   </button>
 
                   {showPassForm && (
@@ -272,7 +272,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
                           onChange={setNewPassword}
                           placeholder="Mínimo 6 dígitos"
                         />
-                        <button onClick={() => setShowPass(!showPass)} className="absolute right-4 bottom-4 text-zinc-400">
+                        <button onClick={() => setShowPass(!showPass)} className="absolute right-4 bottom-4 text-zinc-500">
                           {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
@@ -295,13 +295,13 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
                 </div>
 
                 <div className="p-6 flex items-center justify-between">
-                  <div className="flex items-center gap-4">{theme === 'light' ? <Sun size={22} className="text-orange-500" /> : <Moon size={22} className="text-blue-500" />}<span className="text-[11px] font-black uppercase text-black dark:text-white">Tema Visual</span></div>
-                  <button onClick={() => onToggleTheme(theme === 'light' ? 'dark' : 'light')} className={`w-12 h-7 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-zinc-200'}`}><div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-sm ${theme === 'dark' ? 'left-6' : 'left-1'}`} /></button>
+                  <div className="flex items-center gap-4">{theme === 'light' ? <Sun size={22} className="text-orange-600" /> : <Moon size={22} className="text-blue-500" />}<span className="text-[11px] font-black uppercase text-zinc-950 dark:text-white">Tema Visual</span></div>
+                  <button onClick={() => onToggleTheme(theme === 'light' ? 'dark' : 'light')} className={`w-12 h-7 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-zinc-300'}`}><div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-sm ${theme === 'dark' ? 'left-6' : 'left-1'}`} /></button>
                 </div>
               </div>
 
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-900 rounded-[2.4rem] border border-zinc-100 dark:border-zinc-800 space-y-5">
-                <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em] ml-2">Visão Rápida</h3>
+              <div className="p-6 bg-zinc-100 dark:bg-zinc-900 rounded-[2.4rem] border border-zinc-200 dark:border-zinc-800 space-y-5">
+                <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] ml-2">Visão Rápida</h3>
                 <div className="grid grid-cols-3 gap-3">
                   <QuickContact icon={<MessageCircle size={18} />} label="Whats" value={initialBusiness.whatsapp} />
                   <QuickContact icon={<Phone size={18} />} label="Fone" value={initialBusiness.phone} />
@@ -310,7 +310,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
               </div>
             </div>
           )}
-          <button onClick={() => supabase.auth.signOut()} className="w-full p-6 bg-zinc-50 dark:bg-zinc-900 text-red-600 rounded-[2.2rem] font-black text-[10px] uppercase tracking-widest border border-zinc-100 dark:border-zinc-800 active:bg-red-50 transition-colors flex items-center justify-center gap-3"><LogOut size={20} /> Encerrar Sessão</button>
+          <button onClick={() => supabase.auth.signOut()} className="w-full p-6 bg-zinc-100 dark:bg-zinc-900 text-red-600 rounded-[2.2rem] font-black text-[10px] uppercase tracking-widest border border-zinc-200 dark:border-zinc-800 active:bg-red-50 transition-colors flex items-center justify-center gap-3"><LogOut size={20} /> Encerrar Sessão</button>
         </div>
       </div>
 
@@ -426,29 +426,29 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
 };
 
 const SectionHeader: React.FC<{ icon: React.ReactNode; title: string }> = ({ icon, title }) => (
-  <div className="flex items-center gap-3 px-1 pb-2 border-b border-zinc-100 dark:border-zinc-900">
-    <div className="text-blue-500">{icon}</div>
-    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">{title}</h3>
+  <div className="flex items-center gap-3 px-1 pb-2 border-b border-zinc-200 dark:border-zinc-900">
+    <div className="text-blue-600">{icon}</div>
+    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 dark:text-zinc-500">{title}</h3>
   </div>
 );
 
 const QuickContact: React.FC<{ icon: React.ReactNode; label: string; value?: string }> = ({ icon, label, value }) => (
-  <div className={`p-5 rounded-[1.8rem] flex flex-col items-center gap-2 border border-zinc-100 dark:border-zinc-800 transition-all ${value ? 'opacity-100 bg-white dark:bg-black shadow-sm' : 'opacity-20'}`}>
-    <div className="text-blue-500">{icon}</div>
-    <span className="text-[8px] font-black uppercase text-zinc-400 tracking-tighter">{label}</span>
+  <div className={`p-5 rounded-[1.8rem] flex flex-col items-center gap-2 border border-zinc-200 dark:border-zinc-800 transition-all ${value ? 'opacity-100 bg-white dark:bg-black shadow-sm' : 'opacity-20'}`}>
+    <div className="text-blue-600">{icon}</div>
+    <span className="text-[8px] font-black uppercase text-zinc-600 dark:text-zinc-400 tracking-tighter">{label}</span>
   </div>
 );
 
 const InputGroup: React.FC<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; icon?: React.ReactNode }> = ({ label, value, onChange, placeholder, type = "text", icon }) => (
   <div className="space-y-2 flex-1">
     <div className="flex items-center gap-2 ml-1">
-      {icon && <div className="text-zinc-400">{icon}</div>}
-      <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{label}</label>
+      {icon && <div className="text-zinc-600">{icon}</div>}
+      <label className="text-[9px] font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">{label}</label>
     </div>
     <input
       type={type}
       placeholder={placeholder}
-      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-[14px] font-bold text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-700"
+      className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-2xl p-4 text-[14px] font-bold text-zinc-950 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-700 font-sans"
       value={value}
       onChange={e => onChange(e.target.value)}
     />

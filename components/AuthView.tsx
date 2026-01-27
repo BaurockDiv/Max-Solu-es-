@@ -77,11 +77,11 @@ const AuthView: React.FC<AuthViewProps> = ({ onBack }) => {
 
       <form onSubmit={handleAuth} className="space-y-4">
         <div className="relative group">
-          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 dark:text-zinc-600 group-focus-within:text-blue-600 transition-colors" size={18} />
           <input
             type="email"
             placeholder="E-mail Profissional"
-            className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-white/5 rounded-2xl py-5 pl-12 pr-4 text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus:ring-2 focus:ring-blue-600 transition-all outline-none"
+            className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-white/5 rounded-2xl py-5 pl-12 pr-4 text-zinc-950 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-700 focus:ring-2 focus:ring-blue-600 transition-all outline-none"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -90,11 +90,11 @@ const AuthView: React.FC<AuthViewProps> = ({ onBack }) => {
 
         {mode !== 'forgot' && (
           <div className="relative group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={18} />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 dark:text-zinc-600 group-focus-within:text-blue-600 transition-colors" size={18} />
             <input
               type="password"
               placeholder="Sua Senha"
-              className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-white/5 rounded-2xl py-5 pl-12 pr-4 text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus:ring-2 focus:ring-blue-600 transition-all outline-none"
+              className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-white/5 rounded-2xl py-5 pl-12 pr-4 text-zinc-950 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-700 focus:ring-2 focus:ring-blue-600 transition-all outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -104,7 +104,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onBack }) => {
 
         {mode === 'login' && (
           <div className="flex justify-end px-1">
-            <button type="button" onClick={() => setMode('forgot')} className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest hover:text-blue-500 transition-colors">Esqueceu a senha?</button>
+            <button type="button" onClick={() => setMode('forgot')} className="text-[10px] font-black text-zinc-600 dark:text-zinc-500 uppercase tracking-widest hover:text-blue-600 transition-colors">Esqueceu a senha?</button>
           </div>
         )}
 
@@ -126,14 +126,14 @@ const AuthView: React.FC<AuthViewProps> = ({ onBack }) => {
         {mode !== 'forgot' ? (
           <button
             onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-            className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:text-zinc-900 dark:hover:text-white transition-colors"
+            className="text-zinc-600 dark:text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:text-zinc-950 dark:hover:text-white transition-colors"
           >
             {mode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Faça Login'}
           </button>
         ) : (
           <button
             onClick={() => setMode('login')}
-            className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:text-zinc-900 dark:hover:text-white transition-colors"
+            className="text-zinc-600 dark:text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:text-zinc-950 dark:hover:text-white transition-colors"
           >
             Voltar para o Login
           </button>
@@ -142,7 +142,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onBack }) => {
         {onBack && (
           <button
             onClick={onBack}
-            className="text-zinc-300 dark:text-zinc-700 text-[9px] font-black uppercase tracking-[0.3em] hover:text-blue-500 transition-colors pt-4"
+            className="text-zinc-600 dark:text-zinc-700 text-[9px] font-black uppercase tracking-[0.3em] hover:text-blue-600 transition-colors pt-4"
           >
             Acessar como Visitante
           </button>
