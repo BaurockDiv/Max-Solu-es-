@@ -87,39 +87,44 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     stopCamera();
     const config = qualityConfig[quality];
     try {
-      const constraints = {
-        video: {
-          aspectRatio: { ideal: 9 / 16 },
-          width: { ideal: config.width },
-          height: { ideal: config.height },
-          facingMode: { ideal: facingMode },
-          frameRate: { ideal: 30 } // Mais compatível para início
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      };
-
+      // Tenta inicializar com as configurações de qualidade escolhidas
       let stream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: config.width },
+            height: { ideal: config.height },
+            frameRate: { ideal: 30 }
+          },
+          audio: { echoCancellation: true, noiseSuppression: true }
+        });
       } catch (err) {
-        console.warn("Retrying camera with simple fallback...");
+        console.warn("Falha na qualidade ideal, tentando modo básico...");
+        // Fallback para o modo mais simples possível
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: facingMode } },
           audio: true
         });
       }
 
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setError(null);
-      setFlashLevel(0);
+      if (stream) {
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          // Forçar play() explicitamente para evitar tela preta em alguns sistemas
+          try {
+            await videoRef.current.play();
+          } catch (playErr) {
+            console.warn("Auto-play blocked, waiting for interaction or metadata.");
+          }
+        }
+        setError(null);
+        setFlashLevel(0);
+      }
     } catch (e: any) {
-      console.error("Camera Error:", e);
-      setError("Permissão de câmera negada ou dispositivo indisponível.");
+      console.error("Camera Error total failure:", e);
+      setError("Não foi possível acessar sua câmera. Verifique se o navegador tem permissão.");
     }
   };
 
