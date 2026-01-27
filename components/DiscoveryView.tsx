@@ -14,6 +14,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showCategories, setShowCategories] = useState(false);
 
   // Novos estados de filtro
   const [onlyVerified, setOnlyVerified] = useState(false);
@@ -154,28 +155,55 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
       {/* Area de Conteúdo Scrollable */}
       <div className="flex-1 overflow-y-auto hide-scrollbar smooth-scroll animate-gpu touch-pan-y">
         <div className="p-6 pt-0 space-y-8 pb-32">
-          {/* Categorias - Estilo Mini & Expansível */}
+          {/* Botão de Segmentos Expansível */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between px-1">
-              <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Segmentos ({categories.length})</h2>
-              {selectedCategory && (
-                <button onClick={() => setSelectedCategory(null)} className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Ver Todos</button>
-              )}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat === selectedCategory ? null : cat)}
-                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all active:scale-[0.95] ${selectedCategory === cat ? 'border-blue-600 bg-blue-600 text-white shadow-lg' : 'border-zinc-100 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900 shadow-sm'}`}
-                >
-                  <Grid size={selectedCategory === cat ? 18 : 14} className={selectedCategory === cat ? 'text-white' : 'text-zinc-400'} />
-                  <span className={`text-[8px] font-black uppercase tracking-tighter text-center mt-1.5 line-clamp-1 ${selectedCategory === cat ? 'text-white' : 'text-zinc-600 dark:text-zinc-400'}`}>
-                    {cat.split(' ')[0]}
+            <button
+              onClick={() => setShowCategories(!showCategories)}
+              className={`w-full p-5 rounded-[2rem] border-2 flex items-center justify-between transition-all active:scale-[0.98] ${showCategories || selectedCategory ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/10' : 'border-zinc-100 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900 shadow-sm'}`}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${showCategories || selectedCategory ? 'bg-blue-600 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>
+                  <Grid size={20} />
+                </div>
+                <div className="text-left">
+                  <span className={`text-[11px] font-black uppercase tracking-widest block ${showCategories || selectedCategory ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-950 dark:text-white'}`}>
+                    Categorias e Especialidades
                   </span>
-                </button>
-              ))}
-            </div>
+                  <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter">
+                    {selectedCategory ? `Filtrando: ${selectedCategory}` : 'Explorar por segmento'}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight size={20} className={`text-zinc-400 transition-transform duration-300 ${showCategories ? 'rotate-90' : ''}`} />
+            </button>
+
+            {showCategories && (
+              <div className="grid grid-cols-3 gap-2 p-1 animate-in slide-in-from-top-2 duration-300">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setSelectedCategory(cat === selectedCategory ? null : cat);
+                      // Opcional: fechar ao selecionar, mas deixarei aberto para o usuário ver
+                    }}
+                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all active:scale-[0.95] ${selectedCategory === cat ? 'border-blue-600 bg-blue-600 text-white shadow-lg' : 'border-zinc-100 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900 shadow-sm'}`}
+                  >
+                    <Grid size={selectedCategory === cat ? 18 : 14} className={selectedCategory === cat ? 'text-white' : 'text-zinc-400'} />
+                    <span className={`text-[8px] font-black uppercase tracking-tighter text-center mt-1.5 line-clamp-1 ${selectedCategory === cat ? 'text-white' : 'text-zinc-600 dark:text-zinc-400'}`}>
+                      {cat.split(' ')[0]}
+                    </span>
+                  </button>
+                ))}
+                {selectedCategory && (
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className="col-span-3 py-3 text-[9px] font-black text-blue-600 uppercase tracking-widest text-center mt-2 border border-dashed border-blue-600/30 rounded-xl"
+                  >
+                    Limpar Seleção
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Listagem de Empresas */}
