@@ -480,14 +480,14 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
 
                         for (let i = 0; i < 30; i++) {
                           const cat = categories[i % categories.length];
-                          const name = `${bases[i % bases.length]} Professional ${i + 1}`;
+                          const name = `[TESTE] ${bases[i % bases.length]} Professional ${i + 1}`;
 
                           const { data: bData, error: bErr } = await supabase.from('businesses').insert({
                             name,
                             category: cat,
                             description: `Excelência em ${cat}. Atendimento personalizado e garantia de satisfação.`,
                             logo: `https://picsum.photos/seed/${name.replace(/ /g, '')}/200/200`,
-                            owner_id: '00000000-0000-0000-0000-000000000000'
+                            owner_id: crypto.randomUUID()
                           }).select().single();
 
                           if (bData) {
@@ -517,6 +517,28 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
                     🚀 Gerar 30 Contas de Teste
                   </button>
                   <p className="mt-2 text-[8px] text-zinc-500 font-bold text-center uppercase tracking-tighter italic">Ideal para testar o feed e as categorias</p>
+                  <button
+                    onClick={async (e) => {
+                      if (!window.confirm("Remover TODAS as contas de [TESTE]?")) return;
+                      const target = e.currentTarget;
+                      target.disabled = true;
+                      target.innerText = "LIMPANDO...";
+                      try {
+                        const { data: testBiz } = await supabase.from('businesses').select('id').ilike('name', '[TESTE]%');
+                        if (testBiz && testBiz.length > 0) {
+                          const ids = testBiz.map(b => b.id);
+                          await supabase.from('posts').delete().in('business_id', ids);
+                          await supabase.from('businesses').delete().in('id', ids);
+                          alert("Limpeza concluída.");
+                          window.location.reload();
+                        }
+                      } catch (err) { console.error(err); }
+                      finally { target.disabled = false; target.innerText = "🗑️ LIMPAR DADOS DE TESTE"; }
+                    }}
+                    className="w-full mt-3 py-2 bg-red-600/10 text-red-600 rounded-xl text-[8px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                  >
+                    🗑️ Limpar Dados de Teste
+                  </button>
                 </div>
 
                 <div className="p-6 flex items-center justify-between">
