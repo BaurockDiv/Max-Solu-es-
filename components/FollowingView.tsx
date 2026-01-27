@@ -86,32 +86,42 @@ const FollowingView: React.FC<FollowingViewProps> = ({ onProfileClick }) => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-black transition-colors duration-500">
-      {/* Novidades Bar */}
-      <div className="bg-white/80 dark:bg-black/80 backdrop-blur-xl pt-12 pb-4 border-b border-zinc-200 dark:border-zinc-900">
+    <div className="h-full flex flex-col bg-white dark:bg-black transition-colors duration-500 overflow-hidden">
+      {/* Novidades Bar - Redesenhada para mais clareza */}
+      <div className="bg-zinc-100 dark:bg-zinc-950/50 backdrop-blur-2xl pt-10 pb-4 border-b border-zinc-300 dark:border-zinc-900 shrink-0">
         <div className="px-6 flex items-center justify-between mb-4">
-          <h1 className="text-xl font-black text-zinc-950 dark:text-white uppercase tracking-tighter italic">Seguindo</h1>
-          <div className="flex items-center gap-3">
-            <button onClick={loadFollowingContent} className="text-zinc-500 hover:text-blue-600 transition-colors">
-              <Bell size={20} />
-            </button>
-          </div>
+          <h1 className="text-xl font-black text-zinc-950 dark:text-white uppercase tracking-tighter italic">Rede</h1>
+          <button onClick={loadFollowingContent} className="w-10 h-10 rounded-full bg-white dark:bg-zinc-900 flex items-center justify-center text-zinc-950 dark:text-zinc-400 shadow-sm border border-zinc-200 dark:border-zinc-800">
+            <Bell size={18} />
+          </button>
         </div>
         <div className="flex overflow-x-auto gap-4 px-6 hide-scrollbar">
           {followedBusinesses.map(biz => (
-            <div key={biz.id} className="flex flex-col items-center space-y-1 flex-shrink-0 cursor-pointer active:scale-90 transition-all" onClick={() => onProfileClick(biz.id)}>
-              <div className="w-16 h-16 rounded-[1.8rem] p-1 border-2 border-blue-600 bg-white dark:bg-black shadow-sm">
-                <img src={biz.logo || 'https://picsum.photos/200/200'} className="w-full h-full object-cover rounded-[1.4rem]" alt={biz.name} />
+            <div key={biz.id} className="flex flex-col items-center space-y-1.5 flex-shrink-0 cursor-pointer active:scale-95 transition-all group" onClick={() => onProfileClick(biz.id)}>
+              <div className="w-16 h-16 rounded-[1.8rem] p-0.5 border-2 border-blue-600 bg-white dark:bg-black shadow-lg shadow-blue-500/10 group-active:scale-90 transition-transform">
+                <img src={biz.logo || 'https://picsum.photos/200/200'} className="w-full h-full object-cover rounded-[1.5rem]" alt={biz.name} />
               </div>
-              <span className="text-[8px] font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-tighter max-w-[64px] truncate">{biz.name.split(' ')[0]}</span>
+              <span className="text-[9px] font-black text-zinc-950 dark:text-zinc-400 uppercase tracking-tighter max-w-[70px] truncate">{biz.name.split(' ')[0]}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Feed da Rede */}
-      <div className="flex-1">
-        <FeedView posts={followedPosts} onProfileClick={onProfileClick} hideFollowButton={true} />
+      {/* Feed da Rede - Forçando ocupação total do espaço restante */}
+      <div className="flex-1 relative overflow-hidden bg-black">
+        {followedPosts.length > 0 ? (
+          <FeedView posts={followedPosts} onProfileClick={onProfileClick} hideFollowButton={true} />
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center p-12 text-center space-y-4 bg-white dark:bg-black">
+            <div className="w-20 h-20 rounded-[2rem] bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-zinc-400">
+              <LayoutGrid size={32} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] font-black uppercase text-zinc-950 dark:text-white tracking-widest">Sem posts recentes</p>
+              <p className="text-[9px] font-bold text-zinc-600 dark:text-zinc-500 uppercase tracking-tight">Os profissionais que você segue ainda não postaram novidades.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
