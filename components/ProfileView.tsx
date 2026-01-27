@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Business, MediaPost } from '../types';
+import FeedView from './FeedView';
 
 interface ProfileViewProps {
   business: Business;
@@ -56,20 +57,16 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, sess
   return (
     <div className="flex flex-col h-full overflow-y-auto no-scrollbar bg-white dark:bg-black pb-28 relative transition-colors duration-500">
       {selectedPost && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-300">
-          <div className="absolute top-8 left-8 right-8 flex justify-between z-10">
-            <button onClick={() => setSelectedPost(null)} className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-xl flex items-center justify-center text-white border border-white/10"><X size={20} /></button>
-          </div>
-          <div className="flex-1 flex items-center justify-center">
-            {selectedPost.type === 'video' ? (
-              <video src={selectedPost.media_url} autoPlay loop controls className="max-h-full w-full object-contain" />
-            ) : (
-              <img src={selectedPost.media_url} className="max-h-full w-full object-contain" alt="Preview" />
-            )}
-          </div>
-          <div className="p-8 bg-gradient-to-t from-black to-transparent text-white">
-            <p className="text-sm font-medium leading-relaxed opacity-90">{selectedPost.caption}</p>
-          </div>
+        <div className="fixed inset-0 z-[200] bg-black flex flex-col animate-in fade-in duration-300">
+          <FeedView
+            posts={[
+              selectedPost,
+              ...posts.filter(p => p.id !== selectedPost.id)
+            ]}
+            onProfileClick={() => { }}
+            hideFollowButton={true}
+            onClose={() => setSelectedPost(null)}
+          />
         </div>
       )}
 

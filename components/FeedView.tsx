@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState, memo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Heart, MessageCircle, Share2, Volume2, VolumeX, Maximize2, CheckCircle2, LayoutGrid } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Volume2, VolumeX, Maximize2, CheckCircle2, LayoutGrid, X } from 'lucide-react';
 import { MediaPost } from '../types';
 
 interface FeedViewProps {
@@ -9,9 +9,10 @@ interface FeedViewProps {
   onProfileClick: (businessId: string) => void;
   hideFollowButton?: boolean;
   onRefresh?: () => Promise<void>;
+  onClose?: () => void;
 }
 
-const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowButton, onRefresh }) => {
+const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowButton, onRefresh, onClose }) => {
   const [isGlobalMuted, setIsGlobalMuted] = useState(true);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,6 +72,16 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowBu
       onTouchEnd={handleTouchEnd}
       className="h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar bg-black relative"
     >
+      {/* Botão de Fechar (se houver onClose) */}
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="absolute top-8 left-6 z-[100] w-10 h-10 rounded-xl bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10 active:scale-95 transition-all"
+        >
+          <X size={20} />
+        </button>
+      )}
+
       {/* Indicador de Refresh */}
       <div
         className="absolute top-0 left-0 right-0 flex items-center justify-center z-50 pointer-events-none transition-transform duration-300"
