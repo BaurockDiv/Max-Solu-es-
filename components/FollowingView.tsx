@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Users, LayoutGrid, Bell } from 'lucide-react';
+import { Users, LayoutGrid, Bell, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { MediaPost, Business } from '../types';
 import FeedView from './FeedView';
-import { MOCK_BUSINESSES } from '../data';
 
 interface FollowingViewProps {
   onProfileClick: (id: string) => void;
@@ -20,29 +19,50 @@ const FollowingView: React.FC<FollowingViewProps> = ({ onProfileClick }) => {
   }, []);
 
   const loadFollowingContent = async () => {
+    setLoading(true);
     const followedIds = supabase.helpers.getFollowedIds();
     
-    // Lista de empresas seguidas para o topo
-    const bizList = followedIds.map((id: string) => MOCK_BUSINESSES[id]).filter(Boolean);
-    setFollowedBusinesses(bizList);
-
-    // Posts das empresas seguidas
-    if (followedIds.length > 0) {
-      const { data } = await supabase.from('posts').select('*').in('business_id', followedIds);
-      if (data) {
-        const normalized = data.map((p: any) => ({
-          ...p,
-          business: MOCK_BUSINESSES[p.businessId] || p.business
-        }));
-        setFollowedPosts(normalized);
-      }
+    if (followedIds.length === 0) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    try {
+      // Buscar dados reais das empresas seguidas
+      const { data: bizData } = await supabase
+        .from('businesses')
+        .select('*')
+        .in('id', followedIds);
+
+      if (bizData) setFollowedBusinesses(bizData as any);
+
+      // Buscar posts das empresas seguidas com JOIN real
+      const { data: postData } = await supabase
+        .from('posts')
+        .select('*, business:businesses(*)')
+        .in('business_id', followedIds)
+        .order('created_at', { ascending: false });
+
+      if (postData) {
+        const normalized = postData.map((p: any) => ({
+          ...p,
+          businessId: p.business_id,
+          url: p.media_url,
+          thumbnail: p.thumbnail_url,
+        }));
+        setFollowedPosts(normalized as any);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar rede:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) return (
-    <div className="h-full flex items-center justify-center bg-black">
-      <div className="w-8 h-8 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+    <div className="h-full flex flex-col items-center justify-center bg-black gap-4">
+      <Loader2 className="text-blue-600 animate-spin" size={32} />
+      <p className="text-[10px] font-black uppercase text-zinc-600 tracking-widest">Sincronizando Rede...</p>
     </div>
   );
 
@@ -55,10 +75,10 @@ const FollowingView: React.FC<FollowingViewProps> = ({ onProfileClick }) => {
         <div className="space-y-2">
            <h2 className="text-xl font-black text-white uppercase tracking-tight">Rede Vazia</h2>
            <p className="text-zinc-500 text-xs font-medium leading-relaxed">
-             Siga seus profissionais e empresas favoritos no explorar para ver as atualizações aqui.
+             Você ainda não segue nenhum profissional. Explore novos talentos na aba de busca para ver as novidades aqui.
            </p>
         </div>
-        <button className="px-8 py-4 bg-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl shadow-blue-500/10">
+        <button className="px-8 py-4 bg-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl shadow-blue-500/10 active:scale-95 transition-all">
            Descobrir Profissionais
         </button>
       </div>
@@ -71,13 +91,17 @@ const FollowingView: React.FC<FollowingViewProps> = ({ onProfileClick }) => {
       <div className="bg-black/80 backdrop-blur-xl pt-12 pb-4 border-b border-zinc-900">
         <div className="px-6 flex items-center justify-between mb-4">
            <h1 className="text-xl font-black text-white uppercase tracking-tighter">Sua Rede</h1>
-           <Bell size={20} className="text-zinc-500" />
+           <div className="flex items-center gap-3">
+             <button onClick={loadFollowingContent} className="text-zinc-500 hover:text-white transition-colors">
+                <Bell size={20} />
+             </button>
+           </div>
         </div>
         <div className="flex overflow-x-auto gap-4 px-6 hide-scrollbar">
            {followedBusinesses.map(biz => (
-             <div key={biz.id} className="flex flex-col items-center space-y-1 flex-shrink-0" onClick={() => onProfileClick(biz.id)}>
+             <div key={biz.id} className="flex flex-col items-center space-y-1 flex-shrink-0 cursor-pointer active:scale-90 transition-all" onClick={() => onProfileClick(biz.id)}>
                 <div className="w-16 h-16 rounded-[1.8rem] p-1 border-2 border-blue-600 bg-black">
-                   <img src={biz.logo} className="w-full h-full object-cover rounded-[1.4rem]" alt={biz.name} />
+                   <img src={biz.logo || 'https://picsum.photos/200/200'} className="w-full h-full object-cover rounded-[1.4rem]" alt={biz.name} />
                 </div>
                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-tighter max-w-[64px] truncate">{biz.name.split(' ')[0]}</span>
              </div>

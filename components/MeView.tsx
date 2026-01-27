@@ -7,7 +7,6 @@ import {
   LogOut, 
   ChevronRight, 
   ShieldCheck, 
-  HelpCircle, 
   X,
   Camera,
   Sun,
@@ -15,8 +14,16 @@ import {
   LayoutDashboard,
   TrendingUp,
   Award,
-  Calendar,
-  Loader2
+  Loader2,
+  EyeOff,
+  MessageSquareOff,
+  Database,
+  Trash2,
+  ShieldAlert,
+  BellRing,
+  Lock,
+  KeyRound,
+  PlusCircle
 } from 'lucide-react';
 import { Business, Category } from '../types';
 
@@ -29,7 +36,7 @@ interface MeViewProps {
   onOpenDashboard: () => void;
 }
 
-type SettingsView = 'main' | 'edit-profile';
+type SettingsView = 'main' | 'edit-profile' | 'privacy';
 
 const DAYS_OF_WEEK = [
   { label: 'D', value: 'Dom' }, { label: 'S', value: 'Seg' }, { label: 'T', value: 'Ter' },
@@ -41,7 +48,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  
+
   const [formData, setFormData] = useState<any>({
     name: '',
     bio: '',
@@ -66,13 +73,9 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
         const [start, end] = daysPart.split(' - ');
         const startIndex = DAYS_OF_WEEK.findIndex(d => d.value === start);
         const endIndex = DAYS_OF_WEEK.findIndex(d => d.value === end);
-        if (startIndex !== -1 && endIndex !== -1) {
-          initialDays = DAYS_OF_WEEK.slice(startIndex, endIndex + 1).map(d => d.value);
-        }
+        if (startIndex !== -1 && endIndex !== -1) initialDays = DAYS_OF_WEEK.slice(startIndex, endIndex + 1).map(d => d.value);
       } else if (daysPart.includes(' / ')) {
         initialDays = daysPart.split(' / ');
-      } else if (daysPart !== "Dias a Combinar") {
-        initialDays = [daysPart];
       }
 
       setFormData({
@@ -92,21 +95,18 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
 
   const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && initialBusiness) {
+    if (file && session) {
       setIsUploading(true);
       try {
-        const fileName = `${initialBusiness.id}/${Date.now()}_${file.name.replace(/\s/g, '_')}`;
-        const { data, error } = await supabase.storage
-          .from('logos')
-          .upload(fileName, file);
-        
+        const fileName = `${session.user.id}/${Date.now()}_logo.jpg`;
+        const { data, error } = await supabase.storage.from('logos').upload(fileName, file);
         if (error) throw error;
-        
         const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(data.path);
-        
         setFormData((prev: any) => ({ ...prev, logo: publicUrl }));
-        await supabase.from('businesses').update({ logo: publicUrl }).eq('id', initialBusiness.id);
-        onUpdateBusiness({ ...initialBusiness, logo: publicUrl });
+        if (initialBusiness) {
+          await supabase.from('businesses').update({ logo: publicUrl }).eq('id', initialBusiness.id);
+          onUpdateBusiness({ ...initialBusiness, logo: publicUrl });
+        }
       } catch (err: any) {
         alert("Erro no upload: " + err.message);
       } finally {
@@ -115,67 +115,47 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
     }
   };
 
-  const toggleDay = (day: string) => {
-    setFormData((prev: any) => {
-      const isSelected = prev.selectedDays.includes(day);
-      const newDays = isSelected 
-        ? prev.selectedDays.filter((d: string) => d !== day)
-        : [...prev.selectedDays, day];
-      
-      return { 
-        ...prev, 
-        selectedDays: newDays.sort((a, b) => 
-          DAYS_OF_WEEK.findIndex(d => d.value === a) - DAYS_OF_WEEK.findIndex(d => d.value === b)
-        ) 
-      };
-    });
-  };
-
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!initialBusiness) return;
+    if (!formData.name.trim()) return alert("O nome do negócio é obrigatório.");
+    
     setIsSaving(true);
-    
-    let daysStr = "";
-    const sorted = [...formData.selectedDays];
-    
-    if (sorted.length === 7) {
-      daysStr = "Diariamente";
-    } else if (sorted.length === 0) {
-      daysStr = "Dias a Combinar";
-    } else if (sorted.length === 1) {
-      daysStr = sorted[0];
-    } else {
-      const indices = sorted.map(s => DAYS_OF_WEEK.findIndex(d => d.value === s));
-      const isContiguous = indices.every((val, i) => i === 0 || val === indices[i-1] + 1);
-      
-      if (isContiguous && sorted.length > 1) {
-        daysStr = `${sorted[0]} - ${sorted[sorted.length - 1]}`;
-      } else {
-        daysStr = sorted.join(' / ');
-      }
-    }
+    let daysStr = formData.selectedDays.length === 7 ? "Diariamente" : 
+                 formData.selectedDays.length === 0 ? "Dias a Combinar" : 
+                 formData.selectedDays.join(' / ');
     
     const finalHours = `${daysStr}, ${formData.openTime} - ${formData.closeTime}`;
+    const payload = {
+      name: formData.name,
+      bio: formData.bio,
+      location: formData.location,
+      category: formData.category,
+      logo: formData.logo,
+      hours: finalHours,
+      owner_id: session.user.id
+    };
 
     try {
-      const { error } = await supabase.from('businesses').update({
-        name: formData.name,
-        bio: formData.bio,
-        location: formData.location,
-        category: formData.category,
-        logo: formData.logo,
-        hours: finalHours
-      }).eq('id', initialBusiness.id);
+      let error;
+      if (initialBusiness) {
+        ({ error } = await supabase.from('businesses').update(payload).eq('id', initialBusiness.id));
+      } else {
+        ({ error } = await supabase.from('businesses').insert(payload));
+      }
       
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') throw new Error("Você já possui um perfil profissional cadastrado.");
+        throw error;
+      }
 
-      onUpdateBusiness({ ...initialBusiness, ...formData, hours: finalHours });
-      setIsSaving(false);
+      const { data: updated } = await supabase.from('businesses').select('*').eq('owner_id', session.user.id).single();
+      if (updated) onUpdateBusiness(updated as any);
+
       setSaveSuccess(true);
-      setTimeout(() => { setSaveSuccess(false); setActiveView('main'); }, 1200);
-    } catch (err) {
-      alert("Erro ao salvar dados");
+      setTimeout(() => { setSaveSuccess(false); setActiveView('main'); }, 1500);
+    } catch (err: any) {
+      alert(err.message || "Erro ao salvar perfil.");
+    } finally {
       setIsSaving(false);
     }
   };
@@ -184,82 +164,37 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
     <div className="absolute inset-0 bg-white dark:bg-black z-[60] animate-in slide-in-from-right duration-300 overflow-y-auto pb-32">
       <div className="flex items-center justify-between p-5 sticky top-0 bg-white dark:bg-black z-20 border-b border-zinc-100 dark:border-zinc-900">
         <button onClick={() => setActiveView('main')} className="text-zinc-500 w-9 h-9 rounded-lg flex items-center justify-center bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800"><X size={18} /></button>
-        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-black dark:text-white">Identidade da Marca</h2>
+        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-black dark:text-white">Configurar Negócio</h2>
         <div className="w-9" />
       </div>
       
       <div className="p-6 flex flex-col items-center">
         <div className="relative group cursor-pointer" onClick={() => !isUploading && fileInputRef.current?.click()}>
           <div className="w-28 h-28 rounded-[2.2rem] overflow-hidden border-4 border-blue-600/10 shadow-lg bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center">
-            {isUploading ? (
-              <Loader2 className="animate-spin text-blue-600" size={32} />
-            ) : (
-              <img src={formData.logo || 'https://picsum.photos/200/200'} className="w-full h-full object-cover" alt="Logo" />
-            )}
+            {isUploading ? <Loader2 className="animate-spin text-blue-600" size={32} /> : <img src={formData.logo || 'https://picsum.photos/200/200'} className="w-full h-full object-cover" alt="Logo" />}
           </div>
-          <div className="absolute bottom-0 right-0 w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white border-4 border-white dark:border-black shadow-lg">
-            <Camera size={16} />
-          </div>
+          <div className="absolute bottom-0 right-0 w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white border-4 border-white dark:border-black shadow-lg"><Camera size={16} /></div>
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleLogoChange} />
         </div>
       </div>
 
       <form onSubmit={handleSaveProfile} className="px-5 space-y-5">
-        <InputGroup label="Nome da Marca" value={formData.name} onChange={v => setFormData({...formData, name: v})} />
-        
+        <InputGroup label="Nome Fantasia" value={formData.name} onChange={v => setFormData({...formData, name: v})} />
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-2">Categoria</label>
-            <select 
-              className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-black text-black dark:text-white outline-none focus:border-blue-500 appearance-none"
-              value={formData.category}
-              onChange={(e) => setFormData({...formData, category: e.target.value as Category})}
-            >
+            <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-2">Área de Atuação</label>
+            <select className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-black text-black dark:text-white outline-none" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as Category})}>
               {Object.values(Category).map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
-          <InputGroup label="Cidade/UF" value={formData.location} onChange={v => setFormData({...formData, location: v})} />
+          <InputGroup label="Cidade / Base" value={formData.location} onChange={v => setFormData({...formData, location: v})} />
         </div>
-
-        <div className="space-y-2">
-          <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-2">Funcionamento (Dias da Semana)</label>
-          <div className="grid grid-cols-7 gap-1">
-            {DAYS_OF_WEEK.map((day) => (
-              <button
-                key={day.value}
-                type="button"
-                onClick={() => toggleDay(day.value)}
-                className={`py-3 rounded-lg text-[10px] font-black transition-all ${formData.selectedDays.includes(day.value) ? 'bg-blue-600 text-white shadow-md' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 border border-transparent'}`}
-              >
-                {day.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-[8px] text-zinc-400 italic px-2">
-            {formData.selectedDays.length === 7 ? "Atendimento Diário" : 
-             formData.selectedDays.length === 0 ? "Toque para definir os dias" : 
-             "Dias selecionados salvos."}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-2">Abre às</label>
-            <input type="time" className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-xl p-3 text-xs font-black border border-zinc-100 dark:border-zinc-800 text-black dark:text-white" value={formData.openTime} onChange={e => setFormData({...formData, openTime: e.target.value})} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-2">Fecha às</label>
-            <input type="time" className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-xl p-3 text-xs font-black border border-zinc-100 dark:border-zinc-800 text-black dark:text-white" value={formData.closeTime} onChange={e => setFormData({...formData, closeTime: e.target.value})} />
-          </div>
-        </div>
-
         <div className="space-y-1.5">
-          <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-2">Biografia Profissional</label>
-          <textarea className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-xl p-3 text-xs font-bold h-24 resize-none border border-zinc-100 dark:border-zinc-800 text-black dark:text-white outline-none focus:border-blue-500" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} />
+          <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-2">Apresentação Estratégica</label>
+          <textarea placeholder="Ex: Especialista em branding para startups com 10 anos de mercado..." className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-xl p-3 text-xs font-bold h-24 resize-none border border-zinc-100 dark:border-zinc-800 text-black dark:text-white" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} />
         </div>
-
-        <button type="submit" disabled={isSaving} className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all ${saveSuccess ? 'bg-green-600' : 'bg-black dark:bg-white text-white dark:text-black'} shadow-lg active:scale-95`}>
-          {isSaving ? 'Salvando...' : saveSuccess ? 'Alterações Gravadas!' : 'Salvar Dados'}
+        <button type="submit" disabled={isSaving} className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all ${saveSuccess ? 'bg-green-600' : 'bg-blue-600 text-white'} shadow-lg active:scale-95`}>
+          {isSaving ? 'Salvando Dados...' : saveSuccess ? 'Perfil Atualizado!' : initialBusiness ? 'Salvar Mudanças' : 'Publicar Perfil Profissional'}
         </button>
       </form>
     </div>
@@ -268,62 +203,53 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
   return (
     <div className="flex flex-col min-h-full bg-white dark:bg-black pb-24 relative overflow-hidden transition-colors duration-500">
       {activeView === 'edit-profile' && renderEditProfile()}
-
+      
       <div className="px-6 py-8 flex flex-col items-center text-center space-y-4 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-100 dark:border-zinc-900 rounded-b-[3rem]">
-        <div className="relative">
-          <img src={initialBusiness?.logo || formData.logo} className="w-24 h-24 rounded-[2.5rem] object-cover shadow-xl border-4 border-white dark:border-black" alt="Avatar" />
-          <div className="absolute -bottom-1 -right-1 bg-blue-600 text-white p-2 rounded-lg border-4 border-white dark:border-black shadow-lg">
-             <Award size={14} />
-          </div>
-        </div>
+        <img src={initialBusiness?.logo || 'https://picsum.photos/200/200'} className="w-24 h-24 rounded-[2.5rem] object-cover shadow-xl border-4 border-white dark:border-black" alt="Avatar" />
         <div className="space-y-0.5">
-          <h1 className="text-2xl font-black text-black dark:text-white tracking-tighter uppercase">{initialBusiness?.name || "Usuário"}</h1>
+          <h1 className="text-2xl font-black text-black dark:text-white tracking-tighter uppercase">{initialBusiness?.name || "Membro BizStream"}</h1>
           <p className="text-[9px] text-zinc-400 font-black uppercase tracking-[0.3em]">{session.user.email}</p>
         </div>
       </div>
 
       <div className="p-5 space-y-6">
-        <div className="space-y-3">
-          <h3 className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.4em] px-2">Administração</h3>
-          <button 
-            onClick={onOpenDashboard}
-            className="w-full flex items-center justify-between p-5 bg-blue-600 text-white rounded-2xl shadow-lg active:scale-95 transition-all group"
-          >
-            <div className="flex items-center gap-4">
-               <LayoutDashboard size={20} />
-               <div className="text-left">
-                  <span className="block text-[10px] font-black uppercase tracking-widest">Painel Operacional</span>
-                  <span className="text-[8px] font-bold opacity-70">Métricas e Gerenciamento</span>
-               </div>
-            </div>
-            <TrendingUp size={16} />
-          </button>
-        </div>
+        {!initialBusiness ? (
+          <div className="p-6 bg-blue-600/5 border-2 border-dashed border-blue-600/20 rounded-[2rem] text-center space-y-4">
+             <PlusCircle className="mx-auto text-blue-600" size={32} />
+             <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest leading-relaxed">Sua jornada profissional começa com um perfil de impacto.</p>
+             <button onClick={() => setActiveView('edit-profile')} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20">Criar Portfólio Digital</button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <h3 className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.4em] px-2">Gestão Estratégica</h3>
+            <button onClick={onOpenDashboard} className="w-full flex items-center justify-between p-5 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-500/10 active:scale-95 transition-all">
+              <div className="flex items-center gap-4">
+                 <LayoutDashboard size={20} />
+                 <span className="text-[10px] font-black uppercase tracking-widest text-left">Dashboard de Performance</span>
+              </div>
+              <TrendingUp size={16} />
+            </button>
+          </div>
+        )}
 
         <div className="space-y-3">
-          <h3 className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.4em] px-2">Configurações</h3>
-          <div className="bg-zinc-50 dark:bg-zinc-950 rounded-[1.8rem] overflow-hidden border border-zinc-100 dark:border-zinc-900">
-            <MenuButton icon={<Settings size={20} />} label="Identidade da Marca" onClick={() => setActiveView('edit-profile')} />
-            
+          <h3 className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.4em] px-2">Preferências</h3>
+          <div className="bg-zinc-50 dark:bg-zinc-950 rounded-[1.8rem] overflow-hidden border border-zinc-100 dark:border-zinc-900 shadow-sm">
+            <MenuButton icon={<Settings size={20} />} label="Ajustes do Perfil" onClick={() => setActiveView('edit-profile')} />
             <div className="p-4 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900">
                <div className="flex items-center gap-4">
                   <div className="text-zinc-400">{theme === 'light' ? <Sun size={18}/> : <Moon size={18}/>}</div>
-                  <span className="text-[10px] font-black uppercase text-black dark:text-white">Modo Escuro</span>
+                  <span className="text-[10px] font-black uppercase text-black dark:text-white tracking-tight">Dark Mode</span>
                </div>
-               <button 
-                  onClick={() => onToggleTheme(theme === 'light' ? 'dark' : 'light')}
-                  className={`w-10 h-6 rounded-full transition-all relative ${theme === 'dark' ? 'bg-blue-600' : 'bg-zinc-200'}`}
-               >
-                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${theme === 'dark' ? 'left-5' : 'left-1'}`} />
+               <button onClick={() => onToggleTheme(theme === 'light' ? 'dark' : 'light')} className={`w-10 h-6 rounded-full relative transition-all ${theme === 'dark' ? 'bg-blue-600' : 'bg-zinc-200'}`}>
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${theme === 'dark' ? 'left-5' : 'left-1'}`} />
                </button>
             </div>
-
-            <MenuButton icon={<ShieldCheck size={20} />} label="Privacidade" onClick={() => {}} />
           </div>
         </div>
 
-        <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center justify-center gap-3 p-5 bg-zinc-50 dark:bg-zinc-900 text-red-600 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] active:scale-95 transition-all border border-zinc-100 dark:border-zinc-800">
-          <LogOut size={18} /> Desconectar Conta
+        <button onClick={() => supabase.auth.signOut()} className="w-full p-5 bg-zinc-50 dark:bg-zinc-900 text-red-600 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] border border-zinc-100 dark:border-zinc-800 transition-colors hover:bg-red-50 dark:hover:bg-red-900/10">
+          <LogOut size={18} className="inline mr-2" /> Encerrar Sessão
         </button>
       </div>
     </div>
@@ -333,7 +259,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
 const InputGroup: React.FC<{ label: string; value: string; onChange: (v: string) => void }> = ({ label, value, onChange }) => (
   <div className="space-y-1.5 flex-1">
     <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-2">{label}</label>
-    <input type="text" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-black text-black dark:text-white outline-none focus:border-blue-500" value={value} onChange={e => onChange(e.target.value)} />
+    <input type="text" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-black text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500 transition-all" value={value} onChange={e => onChange(e.target.value)} />
   </div>
 );
 

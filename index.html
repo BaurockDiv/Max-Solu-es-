@@ -1,32 +1,51 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BizStream | Professional Discovery</title>
+    
+    <!-- Meta tags para App Nativo -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="A plataforma de descoberta profissional via mídia de alto impacto.">
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
     <style>
         body { 
             font-family: 'Inter', sans-serif; 
-            background-color: #09090b;
+            background-color: #000;
+            overscroll-behavior-y: none; /* Previne o bounce effect do navegador */
+            -webkit-tap-highlight-color: transparent;
         }
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .video-container { height: calc(100vh - 64px); }
+        
+        /* Ajuste para telas com notch (iPhone X+) */
+        .safe-area-bottom {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
         @media (min-width: 768px) {
             .mobile-frame {
                 max-width: 450px;
                 margin: 0 auto;
-                border-left: 1px solid #27272a;
-                border-right: 1px solid #27272a;
+                border-left: 1px solid #18181b;
+                border-right: 1px solid #18181b;
                 height: 100vh;
                 position: relative;
                 overflow: hidden;
                 background-color: #000;
             }
         }
+
+        /* Animações de transição suaves */
+        .fade-enter { opacity: 0; }
+        .fade-enter-active { opacity: 1; transition: opacity 300ms ease-in; }
     </style>
 <script type="importmap">
 {
@@ -40,9 +59,8 @@
 }
 </script>
 </head>
-<body class="bg-black text-zinc-100">
+<body class="bg-black text-zinc-100 overflow-hidden">
     <div id="root"></div>
-    <!-- Script de entrada essencial para o Vite rodar o aplicativo -->
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>

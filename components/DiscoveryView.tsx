@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
-import { Search, MapPin, TrendingUp, Grid, ChevronRight, X } from 'lucide-react';
-import { Category } from '../types';
-import { MOCK_BUSINESSES } from '../data';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, MapPin, TrendingUp, Grid, ChevronRight, X, Loader2 } from 'lucide-react';
+import { Category, Business } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface DiscoveryViewProps {
   onBusinessClick: (id: string) => void;
@@ -11,17 +11,40 @@ interface DiscoveryViewProps {
 const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const categories = Object.values(Category);
+
+  useEffect(() => {
+    fetchBusinesses();
+  }, []);
+
+  const fetchBusinesses = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      if (data) setBusinesses(data as any);
+    } catch (err) {
+      console.error("Erro ao buscar empresas:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const filteredBusinesses = useMemo(() => {
-    return Object.values(MOCK_BUSINESSES).filter(biz => {
+    return businesses.filter(biz => {
       const matchesSearch = biz.name.toLowerCase().includes(search.toLowerCase()) || 
-                            biz.bio.toLowerCase().includes(search.toLowerCase());
+                            (biz.bio && biz.bio.toLowerCase().includes(search.toLowerCase()));
       const matchesCategory = selectedCategory ? biz.category === selectedCategory : true;
       return matchesSearch && matchesCategory;
     });
-  }, [search, selectedCategory]);
+  }, [search, selectedCategory, businesses]);
 
   return (
     <div className="flex flex-col min-h-full bg-white dark:bg-black p-6 space-y-8 transition-colors duration-500">
@@ -70,28 +93,34 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
       <div className="space-y-5">
         <div className="flex items-center justify-between px-2">
           <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em] flex items-center gap-2">
-            <MapPin size={16} /> Próximo a você
+            <MapPin size={16} /> Profissionais Reais
           </h2>
-          <button className="text-blue-600 text-[10px] font-black uppercase tracking-widest">São Paulo, BR</button>
+          <button onClick={fetchBusinesses} className="text-blue-600 text-[10px] font-black uppercase tracking-widest">Atualizar</button>
         </div>
         
         <div className="space-y-4 pb-28">
-          {filteredBusinesses.length > 0 ? filteredBusinesses.map((biz) => (
+          {loading ? (
+            <div className="flex flex-col items-center py-20 gap-3">
+              <Loader2 className="animate-spin text-blue-600" size={32} />
+              <p className="text-[10px] font-black uppercase text-zinc-400">Carregando Mercado...</p>
+            </div>
+          ) : filteredBusinesses.length > 0 ? filteredBusinesses.map((biz) => (
             <div 
               key={biz.id} 
               onClick={() => onBusinessClick(biz.id)}
               className="flex items-center p-4 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all cursor-pointer active:scale-[0.98] bg-white dark:bg-zinc-900 shadow-sm"
             >
-              <img src={biz.logo} className="w-16 h-16 rounded-[1.4rem] object-cover shadow-md" alt={biz.name} />
+              <img src={biz.logo || 'https://picsum.photos/200/200'} className="w-16 h-16 rounded-[1.4rem] object-cover shadow-md" alt={biz.name} />
               <div className="ml-5 flex-1">
-                <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight">{biz.name}</h3>
-                <p className="text-[11px] text-zinc-500 font-medium line-clamp-1 mb-1">{biz.bio}</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight">{biz.name}</h3>
+                  {biz.verified && <TrendingUp size={12} className="text-blue-500" />}
+                </div>
+                <p className="text-[11px] text-zinc-500 font-medium line-clamp-1 mb-1">{biz.bio || 'Sem descrição'}</p>
                 <div className="flex items-center text-[9px] text-zinc-400 font-black uppercase tracking-widest">
-                  <span className="flex items-center gap-1 text-blue-500">
-                    <TrendingUp size={12} /> {biz.rating}
-                  </span>
+                  <span className="text-blue-500 uppercase tracking-tighter">{biz.category}</span>
                   <span className="mx-3 opacity-20 text-zinc-900 dark:text-white">|</span>
-                  <span>{biz.location.split(',')[0]}</span>
+                  <span>{biz.location?.split(',')[0] || 'Remoto'}</span>
                 </div>
               </div>
               <div className="w-10 h-10 rounded-2xl bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center">
@@ -100,8 +129,8 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
             </div>
           )) : (
             <div className="text-center py-20 space-y-4">
-              <p className="text-zinc-300 font-black uppercase text-xs tracking-widest">Sem resultados</p>
-              <button onClick={() => {setSearch(''); setSelectedCategory(null);}} className="text-blue-600 text-[10px] font-black uppercase tracking-[0.2em] border-b border-blue-600">Resetar Filtros</button>
+              <p className="text-zinc-300 font-black uppercase text-xs tracking-widest">Nenhum profissional cadastrado</p>
+              <button onClick={() => {setSearch(''); setSelectedCategory(null);}} className="text-blue-600 text-[10px] font-black uppercase tracking-[0.2em] border-b border-blue-600">Ver Todos</button>
             </div>
           )}
         </div>

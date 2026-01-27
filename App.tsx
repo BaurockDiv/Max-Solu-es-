@@ -10,7 +10,6 @@ import {
   LogIn
 } from 'lucide-react';
 import { ViewState, Business, MediaPost } from './types';
-import { MOCK_BUSINESSES } from './data';
 import FeedView from './components/FeedView';
 import DiscoveryView from './components/DiscoveryView';
 import ProfileView from './components/ProfileView';
@@ -44,22 +43,32 @@ const App: React.FC = () => {
   }, [theme]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchUserBusiness(session.user.id);
+    const initializeAuth = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      
+      if (currentSession) {
+        await fetchUserBusiness(currentSession.user.id);
+        await supabase.helpers.syncFollows(currentSession.user.id);
+      }
+      
+      await fetchData();
       setLoading(false);
-    });
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) fetchUserBusiness(session.user.id);
-      else {
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setSession(newSession);
+      if (newSession) {
+        await fetchUserBusiness(newSession.user.id);
+        await supabase.helpers.syncFollows(newSession.user.id);
+      } else {
         setUserBusiness(null);
         setActiveTab('feed');
       }
     });
 
-    fetchData();
     return () => subscription.unsubscribe();
   }, []);
 
@@ -74,23 +83,25 @@ const App: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const { data: posts } = await supabase
+      const { data: posts, error } = await supabase
         .from('posts')
         .select(`*, business:businesses(*)`)
         .order('created_at', { ascending: false });
       
+      if (error) throw error;
+
       if (posts) {
         const normalized = posts.map((p: any) => ({
           ...p,
-          businessId: p.businessId || p.business_id,
-          url: p.url || p.media_url,
-          thumbnail: p.thumbnail || p.thumbnail_url,
-          business: p.business || { id: p.businessId || p.business_id, name: "Meu Negócio", logo: 'https://picsum.photos/200/200' }
+          businessId: p.business_id,
+          url: p.media_url,
+          thumbnail: p.thumbnail_url,
+          business: p.business
         }));
         setAllPosts(normalized as any);
       }
     } catch (err) {
-      console.warn("Erro ao buscar posts:", err);
+      console.error("Erro ao carregar feed real:", err);
     }
   };
 
@@ -116,19 +127,27 @@ const App: React.FC = () => {
         alert("Erro: Crie um perfil de negócio primeiro.");
         return;
       }
+      
       const fileName = `${Date.now()}.${type === 'video' ? 'mp4' : 'jpg'}`;
+      const filePath = `${session.user.id}/${fileName}`;
+      
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('media')
-        .upload(`${session.user.id}/${fileName}`, mediaBlob);
+        .upload(filePath, mediaBlob);
+        
       if (uploadError) throw uploadError;
+      
       const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(uploadData.path);
+      
       const { error: dbError } = await supabase.from('posts').insert({
         business_id: bizId,
         type: type,
         media_url: publicUrl,
         caption: caption || "Publicação sem legenda",
-        cta_text: "Saiba Mais"
+        cta_text: "Saiba Mais",
+        thumbnail_url: type === 'image' ? publicUrl : null // Simplificação para o POC
       });
+      
       if (!dbError) {
         await fetchData();
         setActiveTab('feed');
@@ -139,18 +158,11 @@ const App: React.FC = () => {
   };
 
   const navigateToProfile = (businessId: string) => {
-    const post = allPosts.find(p => p.businessId === businessId);
+    const post = allPosts.find(p => p.businessId === businessId || p.business?.id === businessId);
     if (post?.business) {
       setSelectedBusiness(post.business as any);
       setLastTab(activeTab);
       setActiveTab('profile');
-    } else {
-      const biz = MOCK_BUSINESSES[businessId];
-      if (biz) {
-        setSelectedBusiness(biz as any);
-        setLastTab(activeTab);
-        setActiveTab('profile');
-      }
     }
   };
 

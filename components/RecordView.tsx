@@ -1,6 +1,6 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { X, Camera, RotateCcw, Send, ImageIcon, Check, Maximize, Move, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { X, Send, ImageIcon, Check, Maximize, Move, SlidersHorizontal, RefreshCw, Scissors, Play, Pause, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 
 interface RecordViewProps {
   onCancel: () => void;
@@ -8,6 +8,7 @@ interface RecordViewProps {
 }
 
 const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
+  const [step, setStep] = useState<'capture' | 'edit' | 'finalize'>('capture');
   const [captureMode, setCaptureMode] = useState<'video' | 'image'>('video');
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isRecording, setIsRecording] = useState(false);
@@ -15,15 +16,18 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [caption, setCaption] = useState('');
-  
-  const [step, setStep] = useState<'capture' | 'adjust' | 'finalize'>('capture');
-  
-  const [zoom, setZoom] = useState(1);
-  const [offsetY, setOffsetY] = useState(0);
-  
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Estados de Edição
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const editVideoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -32,48 +36,32 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    startCamera();
+    if (step === 'capture') startCamera();
     return () => stopCamera();
-  }, [facingMode]);
+  }, [facingMode, step]);
 
   const startCamera = async () => {
     stopCamera();
-    try {
-      // Constraints de Alta Definição para Mobile
-      const constraints = { 
-        video: { 
-          facingMode: facingMode,
-          // Solicitando resolução Full HD Portrait (1080x1920)
-          width: { ideal: 1080 },
-          height: { ideal: 1920 },
-          aspectRatio: { ideal: 9/16 },
-          frameRate: { ideal: 30 }
-        }, 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true
-        }
-      };
+    setError(null);
+    
+    const constraints = {
+      video: { 
+        width: { ideal: 1080 }, 
+        height: { ideal: 1920 },
+        facingMode: { ideal: facingMode }, 
+        frameRate: { ideal: 30 } 
+      },
+      audio: true
+    };
 
+    try {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Garantindo que a renderização do vídeo seja de alta qualidade via JS props
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(e => console.error("Auto-play failed", e));
-        };
       }
-    } catch (err) {
-      console.error("Erro ao acessar câmera HD:", err);
-      // Fallback para constraints básicos se o sensor não suportar o ideal solicitado
-      try {
-        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: true });
-        streamRef.current = fallbackStream;
-        if (videoRef.current) videoRef.current.srcObject = fallbackStream;
-      } catch (fallbackErr) {
-        alert("Não foi possível acessar a câmera do dispositivo.");
-      }
+    } catch (e: any) {
+      setError("Permissão de câmera negada ou dispositivo em uso.");
     }
   };
 
@@ -84,87 +72,36 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     }
   };
 
-  const toggleCamera = () => {
-    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
-  };
-
-  const takePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      // Sincronizando o canvas com a resolução nativa do sensor
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const ctx = canvas.getContext('2d', { alpha: false });
-      if (ctx) {
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        
-        if (facingMode === 'user') {
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-        }
-        
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Salvando em JPEG com qualidade máxima (1.0)
-        canvas.toBlob((blob) => {
-          if (blob) {
-            setMediaBlob(blob);
-            setPreviewUrl(URL.createObjectURL(blob));
-            setStep('adjust');
-            stopCamera();
-          }
-        }, 'image/jpeg', 1.0);
-      }
-    }
-  };
-
   const startRecording = () => {
     if (!streamRef.current) return;
     chunksRef.current = [];
     
-    // Configurando bitrate de gravação profissional (5Mbps)
-    const options = {
-      mimeType: 'video/webm;codecs=vp9,opus',
-      videoBitsPerSecond: 5000000 // 5.0 Mbps para alta nitidez
-    };
-
-    // Fallback de codec para compatibilidade (Safari/iOS)
-    let finalOptions = options;
-    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-      finalOptions = { 
-        mimeType: 'video/mp4',
-        videoBitsPerSecond: 5000000 
-      };
-    }
-
     try {
-      const recorder = new MediaRecorder(streamRef.current, finalOptions);
+      const options = {
+        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 
+                  MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : '',
+        videoBitsPerSecond: 2500000 // Reduzido para 2.5Mbps para melhor estabilidade de upload móvel
+      };
+
+      const recorder = new MediaRecorder(streamRef.current, options);
       mediaRecorderRef.current = recorder;
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: finalOptions.mimeType });
+        const blob = new Blob(chunksRef.current, { type: options.mimeType });
+        const url = URL.createObjectURL(blob);
         setMediaBlob(blob);
-        setPreviewUrl(URL.createObjectURL(blob));
+        setPreviewUrl(url);
+        setStep('edit');
         setIsRecording(false);
-        setStep('finalize');
       };
-      recorder.start(100); // Coleta dados a cada 100ms para estabilidade
+      recorder.start(1000); // Coleta dados a cada segundo para evitar perda em crash
       setIsRecording(true);
       setDuration(0);
-      timerRef.current = window.setInterval(() => setDuration(p => p + 1), 1000);
-    } catch (e) {
-      console.error("MediaRecorder Error:", e);
-      // Último recurso: gravar sem opções de bitrate se falhar
-      const simpleRecorder = new MediaRecorder(streamRef.current);
-      mediaRecorderRef.current = simpleRecorder;
-      simpleRecorder.start();
-      setIsRecording(true);
+      timerRef.current = window.setInterval(() => setDuration(d => d + 1), 1000);
+    } catch (err) {
+      setError("Falha ao iniciar gravador de mídia.");
     }
   };
 
@@ -175,183 +112,176 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     if (timerRef.current) clearInterval(timerRef.current);
   };
 
-  const handlePost = async () => {
-    if (mediaBlob && !isPublishing) {
-      setIsPublishing(true);
-      await onPost(mediaBlob, captureMode, caption);
+  const takePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        if (facingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            setMediaBlob(blob);
+            setPreviewUrl(URL.createObjectURL(blob));
+            setStep('finalize');
+            stopCamera();
+          }
+        }, 'image/jpeg', 0.9);
+      }
     }
   };
 
-  const renderCaptureControls = () => (
-    <div className="flex flex-col items-center space-y-8 w-full">
-      <div className="flex items-center bg-zinc-900/50 backdrop-blur-xl p-1 rounded-full border border-white/5">
-        <button 
-          onClick={() => setCaptureMode('video')}
-          className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${captureMode === 'video' ? 'bg-white text-black shadow-lg' : 'text-zinc-500'}`}
-        >
-          Vídeo
-        </button>
-        <button 
-          onClick={() => setCaptureMode('image')}
-          className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${captureMode === 'image' ? 'bg-white text-black shadow-lg' : 'text-zinc-500'}`}
-        >
-          Foto
-        </button>
-      </div>
+  const processTrim = async () => {
+    if (captureMode === 'image') {
+        setStep('finalize');
+        return;
+    }
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setStep('finalize');
+    }, 1200);
+  };
 
-      <div className="flex items-center justify-around w-full max-w-sm">
-        <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center text-zinc-500 hover:text-white transition-colors">
-          <ImageIcon size={26} />
-          <span className="text-[8px] mt-1 uppercase font-black tracking-tighter">Upload</span>
-        </button>
+  const handlePost = async () => {
+    if (mediaBlob) {
+      setIsPublishing(true);
+      try {
+        await onPost(mediaBlob, captureMode, caption);
+      } catch (err: any) {
+        alert("Erro no upload: " + err.message);
+        setIsPublishing(false);
+      }
+    }
+  };
 
-        <button 
-          onClick={captureMode === 'image' ? takePhoto : (isRecording ? stopRecording : startRecording)} 
-          className={`w-24 h-24 rounded-full border-4 ${isRecording ? 'border-red-600' : 'border-white/20'} flex items-center justify-center transition-all active:scale-90 group relative shadow-[0_0_30px_rgba(255,255,255,0.1)]`}
-        >
-            <div className={`transition-all duration-300 ${isRecording ? 'w-10 h-10 bg-red-600 rounded-lg' : captureMode === 'image' ? 'w-18 h-18 bg-white rounded-full' : 'w-18 h-18 bg-white/10 rounded-full border-4 border-white'}`}>
-               {!isRecording && captureMode === 'video' && <div className="absolute inset-0 flex items-center justify-center"><div className="w-6 h-6 bg-red-600 rounded-full" /></div>}
-            </div>
-        </button>
-
-        <div className="flex flex-col gap-4">
-          <button onClick={toggleCamera} className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-md flex items-center justify-center text-zinc-400 hover:text-white transition-all active:rotate-180 duration-500">
-            <RefreshCw size={22} />
-          </button>
+  if (error) {
+    return (
+      <div className="fixed inset-0 bg-black z-[110] flex flex-col items-center justify-center p-10 text-center space-y-6">
+        <div className="w-20 h-20 rounded-full bg-red-600/10 flex items-center justify-center text-red-600">
+           <AlertTriangle size={40} />
         </div>
+        <p className="text-white font-black uppercase tracking-widest text-sm leading-relaxed">{error}</p>
+        <button onClick={onCancel} className="px-8 py-4 bg-zinc-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">Voltar ao Início</button>
       </div>
-    </div>
-  );
-
-  const renderAdjustControls = () => (
-    <div className="w-full space-y-8">
-      <div className="space-y-4 px-4">
-        <div className="flex items-center justify-between text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">
-          <div className="flex items-center gap-2"><Maximize size={14}/> Zoom de Precisão</div>
-          <span className="text-blue-500">{Math.round(zoom * 100)}%</span>
-        </div>
-        <input 
-          type="range" min="1" max="3" step="0.01" 
-          value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))}
-          className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
-        />
-        
-        <div className="flex items-center justify-between text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 pt-2">
-          <div className="flex items-center gap-2"><Move size={14}/> Posição Vertical</div>
-        </div>
-        <div className="flex gap-4">
-           <button onClick={() => setOffsetY(o => o - 5)} className="flex-1 py-4 bg-zinc-900 rounded-2xl flex items-center justify-center text-white active:bg-zinc-800 transition-colors"><SlidersHorizontal className="rotate-90" size={20}/></button>
-           <button onClick={() => setOffsetY(o => o + 5)} className="flex-1 py-4 bg-zinc-900 rounded-2xl flex items-center justify-center text-white active:bg-zinc-800 transition-colors"><SlidersHorizontal className="-rotate-90" size={20}/></button>
-           <button onClick={() => { setZoom(1); setOffsetY(0); }} className="px-6 py-4 bg-zinc-800 rounded-2xl text-[10px] font-black text-zinc-400">RESET</button>
-        </div>
-      </div>
-
-      <div className="flex space-x-4 px-2">
-        <button onClick={() => {setPreviewUrl(null); startCamera(); setStep('capture');}} className="flex-1 py-5 bg-zinc-900 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-widest">Descartar</button>
-        <button onClick={() => setStep('finalize')} className="flex-1 py-5 bg-blue-600 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 flex items-center justify-center gap-2">
-           Avançar <Check size={18}/>
-        </button>
-      </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className="fixed inset-0 bg-black z-[100] flex flex-col overflow-hidden transition-colors duration-500">
+    <div className="fixed inset-0 bg-black z-[100] flex flex-col transition-colors duration-500 overflow-hidden">
       <canvas ref={canvasRef} className="hidden" />
-      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" onChange={(e) => {
+
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 p-6 flex items-center justify-between z-50">
+        <button onClick={onCancel} className="w-12 h-12 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white">
+          <X size={24} />
+        </button>
+        {isRecording && (
+          <div className="bg-red-600 px-4 py-2 rounded-full text-white text-[10px] font-black tracking-widest uppercase flex items-center gap-2">
+            <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+            00:{duration.toString().padStart(2, '0')}
+          </div>
+        )}
+      </div>
+
+      {/* Viewport */}
+      <div className="flex-1 relative bg-zinc-950 m-2 rounded-[2.5rem] overflow-hidden border border-white/5 shadow-2xl">
+        {step === 'capture' && (
+          <video 
+            ref={videoRef} 
+            autoPlay muted playsInline 
+            className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+          />
+        )}
+        {step === 'edit' && (
+          <video 
+            ref={editVideoRef}
+            src={previewUrl!}
+            autoPlay loop
+            onLoadedMetadata={(e) => {
+              setVideoDuration(e.currentTarget.duration);
+              setTrimEnd(e.currentTarget.duration);
+            }}
+            className="w-full h-full object-contain bg-black"
+          />
+        )}
+        {step === 'finalize' && (
+          <div className="h-full w-full flex flex-col p-8 space-y-6 justify-center">
+             <div className="aspect-[9/16] w-40 mx-auto rounded-[1.8rem] overflow-hidden border-4 border-white/10 shadow-2xl bg-black">
+                {captureMode === 'video' ? (
+                   <video src={previewUrl!} autoPlay loop muted className="w-full h-full object-cover" />
+                ) : (
+                   <img src={previewUrl!} className="w-full h-full object-cover" />
+                )}
+             </div>
+             <textarea 
+                placeholder="Legenda para converter em negócios..."
+                className="w-full bg-zinc-900/80 rounded-[1.5rem] p-5 text-white text-sm h-32 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                value={caption}
+                onChange={e => setCaption(e.target.value)}
+             />
+          </div>
+        )}
+      </div>
+
+      <div className="p-8 pb-12 bg-black">
+        {step === 'capture' && (
+          <div className="flex flex-col items-center gap-8">
+            <div className="flex bg-zinc-900 p-1 rounded-full border border-white/5">
+               <button onClick={() => setCaptureMode('video')} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${captureMode === 'video' ? 'bg-white text-black' : 'text-zinc-500'}`}>Vídeo</button>
+               <button onClick={() => setCaptureMode('image')} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${captureMode === 'image' ? 'bg-white text-black' : 'text-zinc-500'}`}>Foto</button>
+            </div>
+            <div className="flex items-center justify-around w-full">
+               <button onClick={() => fileInputRef.current?.click()} className="text-zinc-500 w-12 h-12 flex items-center justify-center"><ImageIcon size={28}/></button>
+               <button 
+                  onClick={captureMode === 'image' ? takePhoto : (isRecording ? stopRecording : startRecording)}
+                  className={`w-20 h-20 rounded-full border-4 ${isRecording ? 'border-red-600' : 'border-white'} flex items-center justify-center active:scale-90 transition-transform`}
+                >
+                  <div className={`transition-all ${isRecording ? 'w-8 h-8 bg-red-600 rounded-md' : 'w-16 h-16 bg-white rounded-full'}`} />
+               </button>
+               <button onClick={() => setFacingMode(f => f === 'user' ? 'environment' : 'user')} className="text-zinc-500 w-12 h-12 flex items-center justify-center"><RefreshCw size={28}/></button>
+            </div>
+          </div>
+        )}
+
+        {step === 'edit' && (
+          <div className="space-y-6">
+             <div className="flex gap-4">
+                <button onClick={() => setStep('capture')} className="flex-1 py-5 bg-zinc-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">Descartar</button>
+                <button onClick={processTrim} className="flex-1 py-5 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                   {isProcessing ? <Loader2 className="animate-spin"/> : <>Avançar <ChevronRight size={18}/></>}
+                </button>
+             </div>
+          </div>
+        )}
+
+        {step === 'finalize' && (
+           <div className="flex gap-4">
+              <button onClick={() => setStep(captureMode === 'video' ? 'edit' : 'capture')} className="px-8 py-5 bg-zinc-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest">Voltar</button>
+              <button onClick={handlePost} disabled={isPublishing} className="flex-1 py-5 bg-green-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-lg shadow-green-600/10">
+                 {isPublishing ? <Loader2 className="animate-spin"/> : <><Send size={18}/> PUBLICAR NO BIZSTREAM</>}
+              </button>
+           </div>
+        )}
+      </div>
+
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" onChange={e => {
         const file = e.target.files?.[0];
         if (file) {
           const type = file.type.startsWith('video/') ? 'video' : 'image';
           setCaptureMode(type);
           setMediaBlob(file);
           setPreviewUrl(URL.createObjectURL(file));
+          setStep(type === 'video' ? 'edit' : 'finalize');
           stopCamera();
-          setStep(type === 'image' ? 'adjust' : 'finalize');
         }
       }} />
-
-      <div className="absolute top-0 left-0 right-0 p-8 flex items-center justify-between z-50">
-        <button onClick={onCancel} className="w-12 h-12 rounded-[1.2rem] bg-black/40 backdrop-blur-2xl flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all">
-          <X size={24} />
-        </button>
-        {isRecording && (
-          <div className="bg-red-600 px-6 py-2.5 rounded-full text-white text-[10px] font-black tracking-widest animate-pulse uppercase flex items-center gap-2 shadow-lg">
-             <div className="w-2 h-2 bg-white rounded-full animate-ping" />
-             REC: {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
-          </div>
-        )}
-      </div>
-
-      <div className="flex-1 relative bg-zinc-950 overflow-hidden m-4 rounded-[2.5rem] shadow-2xl border border-white/5 group">
-        {step === 'finalize' ? (
-          <div className="h-full flex flex-col p-10 justify-center space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="aspect-[3/4] w-52 mx-auto rounded-[2.2rem] overflow-hidden border-4 border-white/10 shadow-2xl relative bg-black">
-              {captureMode === 'video' ? (
-                <video src={previewUrl!} autoPlay loop muted className="w-full h-full object-cover" />
-              ) : (
-                <img 
-                  src={previewUrl!} 
-                  className="w-full h-full object-cover" 
-                  style={{ transform: `scale(${zoom}) translateY(${offsetY}px)`, imageRendering: 'high-quality' }} 
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-            </div>
-            <div className="space-y-3">
-               <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-4">Legenda Profissional</label>
-               <textarea 
-                placeholder="Ex: Novo serviço disponível! Agende agora. #negocio #profissional"
-                className="w-full bg-zinc-900/50 border-none rounded-[1.8rem] p-6 text-white text-sm focus:ring-2 focus:ring-blue-500 h-36 resize-none shadow-inner placeholder:text-zinc-700"
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="h-full w-full flex items-center justify-center overflow-hidden bg-black">
-            {previewUrl ? (
-              <div className="w-full h-full relative">
-                {captureMode === 'video' ? (
-                  <video src={previewUrl} className="w-full h-full object-cover" autoPlay loop playsInline />
-                ) : (
-                  <img 
-                    src={previewUrl} 
-                    className="w-full h-full object-cover transition-transform duration-200" 
-                    style={{ transform: `scale(${zoom}) translateY(${offsetY}px)`, imageRendering: 'high-quality' }}
-                  />
-                )}
-                {step === 'adjust' && (
-                  <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
-                     <div className="w-full h-full border-2 border-white/20 border-dashed rounded-[1.8rem]" />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <video 
-                ref={videoRef} 
-                className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} 
-                autoPlay 
-                muted 
-                playsInline 
-                style={{ imageRendering: 'high-quality' }}
-              />
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="p-10 pb-12 bg-black border-t border-white/5">
-        {step === 'capture' && renderCaptureControls()}
-        {step === 'adjust' && renderAdjustControls()}
-        {step === 'finalize' && (
-           <div className="flex space-x-4">
-              <button onClick={() => setStep(captureMode === 'image' ? 'adjust' : 'capture')} className="px-8 py-5 bg-zinc-900 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-widest active:scale-95 transition-all">Voltar</button>
-              <button onClick={handlePost} disabled={isPublishing} className="flex-1 py-5 bg-green-600 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-green-500/10 active:scale-95 transition-all">
-                  {isPublishing ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Send size={18}/> PUBLICAR AGORA</>}
-              </button>
-           </div>
-        )}
-      </div>
     </div>
   );
 };
