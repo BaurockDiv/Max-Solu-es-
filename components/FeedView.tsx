@@ -1,5 +1,6 @@
 
 import React, { useRef, useEffect, useState, memo } from 'react';
+import { supabase } from '../lib/supabase';
 import { Heart, MessageCircle, Share2, Volume2, VolumeX, Maximize2, CheckCircle2, LayoutGrid } from 'lucide-react';
 import { MediaPost } from '../types';
 
@@ -55,8 +56,15 @@ const FeedItem: React.FC<{
   const [isPlaying, setIsPlaying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(supabase.helpers.isPostLiked(post.id));
+  const [likesCount, setLikesCount] = useState(post.likes);
   const business = post.business;
+
+  const handleLike = async () => {
+    const result = await supabase.helpers.toggleLike(post.id, likesCount);
+    setLiked(result.isLiked);
+    setLikesCount(result.count);
+  };
 
   useEffect(() => {
     const handleResize = () => setIsLandscape(window.innerWidth > window.innerHeight);
@@ -142,9 +150,9 @@ const FeedItem: React.FC<{
         {/* Like */}
         <ActionButton
           icon={<Heart size={26} className={liked ? 'fill-red-500 text-red-500 scale-110' : 'text-white'} />}
-          label={post.likes.toString()}
+          label={likesCount.toString()}
           active={liked}
-          onClick={() => setLiked(!liked)}
+          onClick={handleLike}
         />
 
         {/* Chat / Comentários */}

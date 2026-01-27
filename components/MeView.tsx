@@ -273,7 +273,11 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           <div className="flex flex-col items-center">
             <div className="w-full aspect-[4/5] max-w-[280px] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-zinc-100 dark:border-zinc-900 bg-zinc-100 dark:bg-zinc-900 relative">
-              <img src={editFile || editingPost.thumbnail || editingPost.thumbnail_url || editingPost.media_url} className="w-full h-full object-cover" />
+              {editingPost.type === 'video' && !(editFile || editingPost.thumbnail_url) ? (
+                <video src={`${editingPost.media_url}#t=0.5`} className="w-full h-full object-cover" muted preload="metadata" />
+              ) : (
+                <img src={editFile || editingPost.thumbnail_url || editingPost.media_url} className="w-full h-full object-cover" />
+              )}
               {editingPost.type === 'video' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                   <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
@@ -322,8 +326,8 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
             <div key={post.id} className="flex items-center gap-4 p-4 bg-zinc-100 dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-white/5">
               <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 bg-zinc-200 dark:bg-zinc-800 relative">
                 {post.type === 'video' ? (
-                  (post.thumbnail || post.thumbnail_url) ? (
-                    <img src={post.thumbnail || post.thumbnail_url} className="w-full h-full object-cover" />
+                  post.thumbnail_url ? (
+                    <img src={post.thumbnail_url} className="w-full h-full object-cover" />
                   ) : (
                     <video src={`${post.media_url}#t=0.5`} className="w-full h-full object-cover" preload="metadata" muted />
                   )

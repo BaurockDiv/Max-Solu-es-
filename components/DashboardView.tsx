@@ -25,7 +25,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts: init
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [posts, setPosts] = useState<MediaPost[]>(initialPosts);
 
-  const totalViews = posts.reduce((acc, p) => acc + (p.likes * 12), 0);
+  const totalLikes = posts.reduce((acc, p) => acc + (p.likes || 0), 0);
+  const totalViews = totalLikes * 15 + (posts.length * 120);
+  const avgEngagement = posts.length > 0 ? (totalLikes / posts.length).toFixed(1) : "0";
 
   const handleDeletePost = async (id: string) => {
     if (!window.confirm("Tem certeza que deseja remover esta publicação permanentemente?")) return;
@@ -60,15 +62,15 @@ const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts: init
           onClick={() => setActiveMetric('views')}
           icon={<Eye className="text-blue-600" size={24} />}
           label="Alcance Total"
-          value={totalViews > 0 ? `${(totalViews / 1000).toFixed(1)}k` : "0"}
-          change="+12%"
+          value={totalViews > 1000 ? `${(totalViews / 1000).toFixed(1)}k` : totalViews.toString()}
+          change="+15%"
         />
         <StatCard
           active={activeMetric === 'clicks'}
           onClick={() => setActiveMetric('clicks')}
-          icon={<MousePointer2 className="text-green-600" size={24} />}
-          label="Posts Ativos"
-          value={posts.length.toString()}
+          icon={<TrendingUp className="text-green-600" size={24} />}
+          label="Engajamento Médio"
+          value={avgEngagement}
           change="Sincronizado"
         />
       </div>
@@ -96,14 +98,22 @@ const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts: init
         <div className="space-y-5">
           {posts.length > 0 ? posts.map(post => (
             <div key={post.id} className="flex items-center gap-6 p-6 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-[2.5rem] shadow-sm group">
-              <div className="relative w-20 h-20 rounded-[1.8rem] overflow-hidden shadow-lg border-2 border-white dark:border-black flex-shrink-0">
-                <img src={post.thumbnail || post.url} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30"><PlayCircle className="text-white" size={24} /></div>
+              <div className="relative w-20 h-20 rounded-[1.8rem] overflow-hidden shadow-lg border-2 border-white dark:border-black flex-shrink-0 bg-zinc-800">
+                {post.type === 'video' ? (
+                  post.thumbnail_url ? (
+                    <img src={post.thumbnail_url} className="w-full h-full object-cover" />
+                  ) : (
+                    <video src={`${post.url}#t=0.5`} className="w-full h-full object-cover" preload="metadata" muted />
+                  )
+                ) : (
+                  <img src={post.url} className="w-full h-full object-cover" />
+                )}
+                {post.type === 'video' && <div className="absolute inset-0 flex items-center justify-center bg-black/30"><PlayCircle className="text-white" size={24} /></div>}
               </div>
               <div className="flex-1">
-                <p className="text-sm font-black text-zinc-950 dark:text-white uppercase tracking-tight line-clamp-1">{post.caption}</p>
+                <p className="text-sm font-black text-zinc-950 dark:text-white uppercase tracking-tight line-clamp-1">{post.caption || "Sem Legenda"}</p>
                 <div className="flex items-center gap-4 mt-1">
-                  <span className="text-[9px] text-zinc-600 dark:text-zinc-400 font-bold uppercase tracking-widest">Impacto: {post.likes * 5} pts</span>
+                  <span className="text-[9px] text-zinc-600 dark:text-zinc-400 font-bold uppercase tracking-widest">{post.likes || 0} Curtidas • Impacto: {(post.likes || 0) * 12} pts</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">

@@ -19,10 +19,10 @@ let followedBusinessIds = getInitialFollows();
 
 const supabaseHelpers = {
   getFollowedIds: () => Array.from(followedBusinessIds),
-  
+
   toggleFollow: async (businessId: string, userId?: string) => {
     const isFollowing = followedBusinessIds.has(businessId);
-    
+
     try {
       if (isFollowing) {
         followedBusinessIds.delete(businessId);
@@ -35,15 +35,15 @@ const supabaseHelpers = {
           await supabaseReal.from('follows').insert({ user_id: userId, business_id: businessId });
         }
       }
-      
+
       localStorage.setItem('maxcompany_follows', JSON.stringify(Array.from(followedBusinessIds)));
     } catch (err) {
       console.error("Erro ao sincronizar follow:", err);
     }
-    
+
     return Array.from(followedBusinessIds);
   },
-  
+
   isFollowing: (id: string) => followedBusinessIds.has(id),
 
   syncFollows: async (userId: string) => {
@@ -57,6 +57,38 @@ const supabaseHelpers = {
     } catch (err) {
       console.warn("Falha ao sincronizar rede remota");
     }
+  },
+
+  toggleLike: async (postId: string, currentLikes: number) => {
+    const likes = JSON.parse(localStorage.getItem('maxcompany_likes') || '[]');
+    const index = likes.indexOf(postId);
+    const isLiked = index !== -1;
+    let newLikesCount = currentLikes;
+
+    try {
+      if (isLiked) {
+        likes.splice(index, 1);
+        newLikesCount = Math.max(0, currentLikes - 1);
+      } else {
+        likes.push(postId);
+        newLikesCount = currentLikes + 1;
+      }
+
+      localStorage.setItem('maxcompany_likes', JSON.stringify(likes));
+
+      // Atualiza no banco
+      await supabaseReal.from('posts').update({ likes: newLikesCount }).eq('id', postId);
+
+    } catch (err) {
+      console.error("Erro ao processar like:", err);
+    }
+
+    return { isLiked: !isLiked, count: newLikesCount };
+  },
+
+  isPostLiked: (postId: string) => {
+    const likes = JSON.parse(localStorage.getItem('maxcompany_likes') || '[]');
+    return likes.includes(postId);
   }
 };
 
