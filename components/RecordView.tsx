@@ -93,15 +93,12 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
           width: { ideal: config.width },
           height: { ideal: config.height },
           facingMode: { ideal: facingMode },
-          frameRate: { ideal: 60, min: 30 } // Tenta forçar 60fps, aceita 30
+          frameRate: { ideal: 30 } // Mais compatível para início
         },
-        // AUDIO PRO: Desativa filtros que destroem a qualidade em gravações
         audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: 2,
-          sampleRate: 48000
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         }
       };
 
