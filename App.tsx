@@ -149,7 +149,7 @@ const App: React.FC = () => {
         const biz = allPosts.find(p => p.businessId === id || p.business?.id === id)?.business;
         if (biz) { setSelectedBusiness(biz as any); setLastTab('following'); setActiveTab('profile'); }
       }} />;
-      case 'profile': return <ProfileView business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} />;
+      case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} />;
       case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
       case 'me': return <MeView session={session} business={userBusiness} onUpdateBusiness={handleUpdateBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} />;
       case 'record': return <RecordView onCancel={() => setActiveTab('feed')} onPost={handleNewPost} />;

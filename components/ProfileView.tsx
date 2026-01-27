@@ -15,18 +15,26 @@ import {
   X,
   Play
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { Business, MediaPost } from '../types';
 
 interface ProfileViewProps {
   business: Business;
   posts: MediaPost[];
   onBack: () => void;
+  session?: any;
 }
 
-const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack }) => {
-  const [following, setFollowing] = useState(false);
+const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, session }) => {
+  const [following, setFollowing] = useState(supabase.helpers.isFollowing(business.id));
   const [activeTab, setActiveTab] = useState<'posts' | 'info'>('posts');
   const [selectedPost, setSelectedPost] = useState<MediaPost | null>(null);
+
+  const handleFollow = async () => {
+    const userId = session?.user?.id;
+    const newFollows = await supabase.helpers.toggleFollow(business.id, userId);
+    setFollowing(newFollows.includes(business.id));
+  };
 
   const handleContact = (type: 'whatsapp' | 'email' | 'phone') => {
     if (type === 'whatsapp' && business.whatsapp) {
@@ -79,7 +87,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack }) =>
             <div className="absolute bottom-0 right-0 bg-green-500 w-5 h-5 rounded-full border-[3px] border-white dark:border-black shadow-lg" />
           </div>
           <div className="flex space-x-2 mb-2">
-            <button onClick={() => setFollowing(!following)} className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-md flex items-center justify-center ${following ? 'bg-zinc-200 dark:bg-zinc-900 text-black dark:text-zinc-400 border border-zinc-300 dark:border-none' : 'bg-blue-600 text-white shadow-blue-500/10'}`}>{following ? 'Seguindo' : 'Seguir'}</button>
+            <button onClick={handleFollow} className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-md flex items-center justify-center ${following ? 'bg-zinc-200 dark:bg-zinc-900 text-black dark:text-zinc-400 border border-zinc-300 dark:border-none' : 'bg-blue-600 text-white shadow-blue-500/10'}`}>{following ? 'Seguindo' : 'Seguir'}</button>
           </div>
         </div>
 
