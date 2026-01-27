@@ -10,9 +10,10 @@ interface FeedViewProps {
   hideFollowButton?: boolean;
   onRefresh?: () => Promise<void>;
   onClose?: () => void;
+  userId?: string;
 }
 
-const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowButton, onRefresh, onClose }) => {
+const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowButton, onRefresh, onClose, userId }) => {
   const [isGlobalMuted, setIsGlobalMuted] = useState(true);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,6 +102,7 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowBu
               hideFollowButton={hideFollowButton}
               isGlobalMuted={isGlobalMuted}
               hasInteracted={hasInteracted}
+              userId={userId}
               onMuteToggle={() => {
                 setIsGlobalMuted(!isGlobalMuted);
                 setHasInteracted(true);
@@ -120,17 +122,18 @@ const FeedItem: React.FC<{
   isGlobalMuted: boolean;
   hasInteracted: boolean;
   onMuteToggle: () => void;
-}> = memo(({ post, onProfileClick, hideFollowButton, isGlobalMuted, hasInteracted, onMuteToggle }) => {
+  userId?: string;
+}> = memo(({ post, onProfileClick, hideFollowButton, isGlobalMuted, hasInteracted, onMuteToggle, userId }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
-  const [liked, setLiked] = useState(supabase.helpers.isPostLiked(post.id));
-  const [likesCount, setLikesCount] = useState(post.likes);
+  const [liked, setLiked] = useState(supabase.helpers.isPostLiked(post.id, userId));
+  const [likesCount, setLikesCount] = useState(Number(post.likes) || 0);
   const business = post.business;
 
   const handleLike = async () => {
-    const result = await supabase.helpers.toggleLike(post.id, likesCount);
+    const result = await supabase.helpers.toggleLike(post.id, likesCount, userId);
     setLiked(result.isLiked);
     setLikesCount(result.count);
   };

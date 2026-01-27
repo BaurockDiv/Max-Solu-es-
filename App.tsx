@@ -48,6 +48,7 @@ const App: React.FC = () => {
         supabase.helpers.syncFollows(session.user.id);
       } else {
         setUserBusiness(null);
+        supabase.helpers.clearSessionData();
         setActiveTab('feed');
       }
     });
@@ -69,7 +70,14 @@ const App: React.FC = () => {
   const fetchData = async () => {
     const { data, error } = await supabase.from('posts').select('*, business:businesses(*)').order('created_at', { ascending: false }).limit(40);
     if (!error && data) {
-      setAllPosts(data.map((p: any) => ({ ...p, businessId: p.business_id, url: p.media_url, thumbnail: p.thumbnail_url, business: p.business })) as any);
+      setAllPosts(data.map((p: any) => ({
+        ...p,
+        businessId: p.business_id,
+        url: p.media_url,
+        thumbnail: p.thumbnail_url,
+        business: p.business,
+        likes: Number(p.likes) || 0
+      })) as any);
     }
   };
 
@@ -156,9 +164,9 @@ const App: React.FC = () => {
       return <AuthView onBack={() => setActiveTab('feed')} />;
     }
     switch (activeTab) {
-      case 'feed': return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} onRefresh={fetchData} />;
+      case 'feed': return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} onRefresh={fetchData} userId={session?.user.id} />;
       case 'discovery': return <DiscoveryView onBusinessClick={(id) => openProfile(id, 'discovery')} />;
-      case 'following': return <FollowingView onProfileClick={(id) => openProfile(id, 'following')} />;
+      case 'following': return <FollowingView onProfileClick={(id) => openProfile(id, 'following')} userId={session?.user.id} />;
       case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} />;
       case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
       case 'me': return <MeView session={session} business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} onUpdateBusiness={handleUpdateBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} onPreviewProfile={(id) => openProfile(id, 'me')} />;

@@ -66,6 +66,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, sess
             onProfileClick={() => { }}
             hideFollowButton={true}
             onClose={() => setSelectedPost(null)}
+            userId={session?.user.id}
           />
         </div>
       )}

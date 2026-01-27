@@ -7,16 +7,17 @@ import FeedView from './FeedView';
 
 interface FollowingViewProps {
   onProfileClick: (id: string) => void;
+  userId?: string;
 }
 
-const FollowingView: React.FC<FollowingViewProps> = ({ onProfileClick }) => {
+const FollowingView: React.FC<FollowingViewProps> = ({ onProfileClick, userId }) => {
   const [followedPosts, setFollowedPosts] = useState<MediaPost[]>([]);
   const [followedBusinesses, setFollowedBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadFollowingContent();
-  }, []);
+  }, [userId]);
 
   const loadFollowingContent = async () => {
     setLoading(true);
@@ -108,7 +109,7 @@ const FollowingView: React.FC<FollowingViewProps> = ({ onProfileClick }) => {
       {/* Feed da Rede - Forçando ocupação total do espaço restante */}
       <div className="flex-1 relative overflow-hidden bg-black">
         {followedPosts.length > 0 ? (
-          <FeedView posts={followedPosts} onProfileClick={onProfileClick} hideFollowButton={true} />
+          <FeedView posts={followedPosts} onProfileClick={onProfileClick} hideFollowButton={true} userId={userId} />
         ) : (
           <div className="h-full flex flex-col items-center justify-center p-12 text-center space-y-4 bg-white dark:bg-black">
             <div className="w-20 h-20 rounded-[2rem] bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-zinc-400">
