@@ -464,6 +464,61 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
                   )}
                 </div>
 
+                {/* Seeder de Teste - 30 Contas */}
+                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-blue-600/5">
+                  <button
+                    id="seed-btn"
+                    onClick={async (e) => {
+                      if (!window.confirm("Isso criará 30 perfis e cerca de 60 posts. Deseja continuar?")) return;
+                      const target = e.currentTarget;
+                      target.disabled = true;
+                      target.innerText = "CRIAÇÃO EM ANDAMENTO...";
+
+                      try {
+                        const categories = ['Estética', 'Manutenção', 'Gastronomia', 'TI', 'Construção', 'Serviços'];
+                        const bases = ["Premium", "Max", "Star", "Mega", "Alpha", "Global", "Nova", "Elite", "Prime", "Studio"];
+
+                        for (let i = 0; i < 30; i++) {
+                          const cat = categories[i % categories.length];
+                          const name = `${bases[i % bases.length]} Professional ${i + 1}`;
+
+                          const { data: bData, error: bErr } = await supabase.from('businesses').insert({
+                            name,
+                            category: cat,
+                            description: `Excelência em ${cat}. Atendimento personalizado e garantia de satisfação.`,
+                            logo: `https://picsum.photos/seed/${name.replace(/ /g, '')}/200/200`,
+                            owner_id: '00000000-0000-0000-0000-000000000000'
+                          }).select().single();
+
+                          if (bData) {
+                            for (let j = 1; j <= 2; j++) {
+                              await supabase.from('posts').insert({
+                                business_id: bData.id,
+                                media_url: `https://picsum.photos/seed/p${bData.id}${j}/800/1000`,
+                                type: 'image',
+                                caption: `Trabalho de hoje na ${name}! Qualidade máxima. #serviço #${cat.toLowerCase()}`,
+                                likes: Math.floor(Math.random() * 80)
+                              });
+                            }
+                          }
+                          if (i % 5 === 0) console.log(`Criados ${i} perfis...`);
+                        }
+                        alert("30 Contas e 60 Posts gerados com sucesso!");
+                        window.location.reload();
+                      } catch (err) {
+                        console.error(err);
+                        alert("Erro ao gerar dados. Verifique o console.");
+                        target.disabled = false;
+                        target.innerText = "TENTAR GERAR NOVAMENTE";
+                      }
+                    }}
+                    className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-xl shadow-blue-500/10 active:scale-95 transition-all"
+                  >
+                    🚀 Gerar 30 Contas de Teste
+                  </button>
+                  <p className="mt-2 text-[8px] text-zinc-500 font-bold text-center uppercase tracking-tighter italic">Ideal para testar o feed e as categorias</p>
+                </div>
+
                 <div className="p-6 flex items-center justify-between">
                   <div className="flex items-center gap-4">{theme === 'light' ? <Sun size={22} className="text-orange-600" /> : <Moon size={22} className="text-blue-500" />}<span className="text-[11px] font-black uppercase text-zinc-950 dark:text-white">Tema Visual</span></div>
                   <button onClick={() => onToggleTheme(theme === 'light' ? 'dark' : 'light')} className={`w-12 h-7 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-zinc-300'}`}><div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-sm ${theme === 'dark' ? 'left-6' : 'left-1'}`} /></button>

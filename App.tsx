@@ -232,7 +232,9 @@ const App: React.FC = () => {
             label="Início"
             onClick={() => {
               if (activeTab === 'feed') {
-                window.location.reload();
+                setAllPosts([]);
+                fetchData();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               } else {
                 setActiveTab('feed');
               }
