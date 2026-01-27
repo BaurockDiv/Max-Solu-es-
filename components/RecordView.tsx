@@ -40,20 +40,34 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     stopCamera();
     try {
       const constraints = {
-        video: { 
-          width: { ideal: 3840 }, 
-          height: { ideal: 2160 }, 
+        video: {
+          aspectRatio: { ideal: 9 / 16 },
+          width: { ideal: 2160 },
+          height: { ideal: 3840 },
           facingMode: { ideal: facingMode },
           frameRate: { ideal: 60 }
         },
         audio: { echoCancellation: true, noiseSuppression: true }
       };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        // Fallback: se 4K/60fps falhar, tenta padrão
+        console.warn("Retrying camera with lower constraints...");
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facingMode } },
+          audio: true
+        });
+      }
+
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
       setError(null);
     } catch (e: any) {
-      setError("Não foi possível acessar a câmera em alta resolução. Verifique as permissões.");
+      console.error("Camera Error:", e);
+      setError("Não foi possível acessar a câmera. Verifique as permissões.");
     }
   };
 
@@ -67,7 +81,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const startRecording = () => {
     if (!streamRef.current) return;
     chunksRef.current = [];
-    const options = { 
+    const options = {
       mimeType: MediaRecorder.isTypeSupported('video/mp4;codecs=h264') ? 'video/mp4;codecs=h264' : 'video/webm;codecs=vp9',
       videoBitsPerSecond: 8000000 // 8Mbps para qualidade profissional
     };
@@ -135,15 +149,28 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
           </div>
         )}
         <div className="flex gap-4">
-           <button className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white"><Zap size={20}/></button>
-           <button className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white"><Settings size={20}/></button>
+          <button className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white"><Zap size={20} /></button>
+          <button className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white"><Settings size={20} /></button>
         </div>
       </div>
 
       {/* Preview da Câmera */}
       <div className="flex-1 relative bg-black flex items-center justify-center">
         {step === 'capture' ? (
-          <video ref={videoRef} autoPlay muted playsInline className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} />
+          <>
+            {error ? (
+              <div className="flex flex-col items-center justify-center text-center p-8 space-y-4">
+                <AlertTriangle size={48} className="text-red-500 mb-2" />
+                <p className="text-white font-bold text-lg">Câmera Indisponível</p>
+                <p className="text-zinc-500 text-sm max-w-xs">{error}</p>
+                <button onClick={() => fileInputRef.current?.click()} className="mt-4 bg-zinc-800 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest">
+                  Escolher Arquivo
+                </button>
+              </div>
+            ) : (
+              <video ref={videoRef} autoPlay muted playsInline className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} />
+            )}
+          </>
         ) : (
           <div className="w-full h-full">
             {captureMode === 'video' ? (
@@ -161,44 +188,44 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         {step === 'capture' ? (
           <>
             <div className="flex gap-10">
-               <button onClick={() => setCaptureMode('video')} className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all ${captureMode === 'video' ? 'text-blue-500 scale-110' : 'text-zinc-600'}`}>Vídeo</button>
-               <button onClick={() => setCaptureMode('image')} className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all ${captureMode === 'image' ? 'text-blue-500 scale-110' : 'text-zinc-600'}`}>Foto</button>
+              <button onClick={() => setCaptureMode('video')} className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all ${captureMode === 'video' ? 'text-blue-500 scale-110' : 'text-zinc-600'}`}>Vídeo</button>
+              <button onClick={() => setCaptureMode('image')} className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all ${captureMode === 'image' ? 'text-blue-500 scale-110' : 'text-zinc-600'}`}>Foto</button>
             </div>
-            
-            <div className="flex items-center justify-between w-full">
-               <button onClick={() => fileInputRef.current?.click()} className="w-14 h-14 rounded-2xl bg-zinc-900 flex items-center justify-center text-zinc-400 border border-white/5"><ImageIcon size={24}/></button>
-               
-               <button 
-                  onClick={captureMode === 'image' ? takePhoto : (isRecording ? stopRecording : startRecording)}
-                  className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-all p-1"
-               >
-                  <div className={`transition-all duration-300 ${isRecording ? 'w-8 h-8 bg-red-600 rounded-lg' : captureMode === 'video' ? 'w-16 h-16 bg-red-600 rounded-full' : 'w-16 h-16 bg-white rounded-full'}`} />
-               </button>
 
-               <button onClick={() => setFacingMode(f => f === 'user' ? 'environment' : 'user')} className="w-14 h-14 rounded-2xl bg-zinc-900 flex items-center justify-center text-zinc-400 border border-white/5"><RefreshCw size={24}/></button>
+            <div className="flex items-center justify-between w-full">
+              <button onClick={() => fileInputRef.current?.click()} className="w-14 h-14 rounded-2xl bg-zinc-900 flex items-center justify-center text-zinc-400 border border-white/5"><ImageIcon size={24} /></button>
+
+              <button
+                onClick={captureMode === 'image' ? takePhoto : (isRecording ? stopRecording : startRecording)}
+                className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-all p-1"
+              >
+                <div className={`transition-all duration-300 ${isRecording ? 'w-8 h-8 bg-red-600 rounded-lg' : captureMode === 'video' ? 'w-16 h-16 bg-red-600 rounded-full' : 'w-16 h-16 bg-white rounded-full'}`} />
+              </button>
+
+              <button onClick={() => setFacingMode(f => f === 'user' ? 'environment' : 'user')} className="w-14 h-14 rounded-2xl bg-zinc-900 flex items-center justify-center text-zinc-400 border border-white/5"><RefreshCw size={24} /></button>
             </div>
           </>
         ) : (
           <div className="w-full space-y-6">
-            <textarea 
-               placeholder="Escreva sua legenda..."
-               className="w-full bg-zinc-900 rounded-3xl p-5 text-white text-sm h-28 outline-none border border-white/5 focus:border-blue-600 transition-all resize-none"
-               value={caption}
-               onChange={e => setCaption(e.target.value)}
+            <textarea
+              placeholder="Escreva sua legenda..."
+              className="w-full bg-zinc-900 rounded-3xl p-5 text-white text-sm h-28 outline-none border border-white/5 focus:border-blue-600 transition-all resize-none"
+              value={caption}
+              onChange={e => setCaption(e.target.value)}
             />
             <div className="flex gap-3">
-               <button onClick={() => setStep('capture')} className="w-16 h-16 rounded-3xl bg-zinc-900 flex items-center justify-center text-white border border-white/5"><RefreshCw size={24}/></button>
-               <button 
+              <button onClick={() => setStep('capture')} className="w-16 h-16 rounded-3xl bg-zinc-900 flex items-center justify-center text-white border border-white/5"><RefreshCw size={24} /></button>
+              <button
                 onClick={async () => {
                   setUploadStatus({ progress: 10, stage: 'Publicando...' });
                   await onPost(mediaBlob!, captureMode, caption, (p, s) => setUploadStatus({ progress: p, stage: s }));
                   onCancel();
                 }}
                 className="flex-1 h-16 bg-blue-600 rounded-3xl text-white font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center gap-3"
-               >
-                 {uploadStatus ? <Loader2 className="animate-spin"/> : <Send size={20}/>}
-                 {uploadStatus ? 'Sincronizando...' : 'Publicar Agora'}
-               </button>
+              >
+                {uploadStatus ? <Loader2 className="animate-spin" /> : <Send size={20} />}
+                {uploadStatus ? 'Sincronizando...' : 'Publicar Agora'}
+              </button>
             </div>
           </div>
         )}

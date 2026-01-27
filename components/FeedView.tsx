@@ -1,8 +1,7 @@
 
-import React, { useRef, useEffect, useState, memo, useCallback } from 'react';
-import { Heart, MessageCircle, Share2, ShoppingBag, CheckCircle2, X, Send, UserPlus, UserCheck, Loader2, Volume2, VolumeX, Maximize2 } from 'lucide-react';
-import { MediaPost, Comment } from '../types';
-import { supabase } from '../lib/supabase';
+import React, { useRef, useEffect, useState, memo } from 'react';
+import { Heart, MessageCircle, Share2, Volume2, VolumeX, Maximize2, CheckCircle2 } from 'lucide-react';
+import { MediaPost } from '../types';
 
 interface FeedViewProps {
   posts: MediaPost[];
@@ -14,37 +13,21 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowBu
   const [isGlobalMuted, setIsGlobalMuted] = useState(true);
   const [hasInteracted, setHasInteracted] = useState(false);
 
-  const handleInitialInteraction = () => {
-    setIsGlobalMuted(false);
-    setHasInteracted(true);
-  };
-
+  // Se não houver posts
   if (posts.length === 0) return (
     <div className="h-full flex items-center justify-center bg-black text-zinc-600 font-black uppercase tracking-widest text-[10px]">Sem novidades na região</div>
   );
 
   return (
     <div className="h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar bg-black relative">
-      {/* Botão de Ativar Áudio Estilizado */}
-      {!hasInteracted && (
-        <button 
-          onClick={handleInitialInteraction}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-transparent text-white font-black text-[13px] uppercase tracking-[0.4em] animate-pulse pointer-events-auto transition-all"
-          style={{
-            textShadow: '-0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000'
-          }}
-        >
-          Toque para Ativar Áudio
-        </button>
-      )}
-      
       {posts.map((post) => (
-        <FeedItem 
-          key={post.id} 
-          post={post} 
-          onProfileClick={onProfileClick} 
+        <FeedItem
+          key={post.id}
+          post={post}
+          onProfileClick={onProfileClick}
           hideFollowButton={hideFollowButton}
           isGlobalMuted={isGlobalMuted}
+          hasInteracted={hasInteracted}
           onMuteToggle={() => {
             setIsGlobalMuted(!isGlobalMuted);
             setHasInteracted(true);
@@ -55,13 +38,14 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowBu
   );
 };
 
-const FeedItem: React.FC<{ 
-  post: MediaPost; 
-  onProfileClick: (id: string) => void; 
+const FeedItem: React.FC<{
+  post: MediaPost;
+  onProfileClick: (id: string) => void;
   hideFollowButton?: boolean;
   isGlobalMuted: boolean;
+  hasInteracted: boolean;
   onMuteToggle: () => void;
-}> = memo(({ post, onProfileClick, hideFollowButton, isGlobalMuted, onMuteToggle }) => {
+}> = memo(({ post, onProfileClick, hideFollowButton, isGlobalMuted, hasInteracted, onMuteToggle }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -71,7 +55,7 @@ const FeedItem: React.FC<{
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) {
-        videoRef.current?.play().catch(() => {});
+        videoRef.current?.play().catch(() => { });
         setIsPlaying(true);
       } else {
         videoRef.current?.pause();
@@ -84,10 +68,13 @@ const FeedItem: React.FC<{
 
   if (!business) return null;
 
+  // Lógica do Alerta de Áudio: Só mostra se for vídeo, estiver mutado e usuário nunca interagiu
+  const showAudioAlert = post.type === 'video' && isGlobalMuted && !hasInteracted;
+
   return (
     <div className="h-full w-full snap-start relative flex items-center justify-center bg-black overflow-hidden animate-gpu">
       {post.type === 'video' ? (
-        <video 
+        <video
           ref={videoRef}
           src={post.url}
           loop
@@ -120,61 +107,75 @@ const FeedItem: React.FC<{
 
       {/* Ações Laterais - Coluna Única Perfeitamente Alinhada */}
       <div className="absolute right-3 bottom-24 flex flex-col items-center gap-6 z-30">
-        
+
         {/* Controle de Expansão (Apenas Vídeo) */}
         {post.type === 'video' && (
-          <ActionButton 
-            icon={<Maximize2 size={22} className={isExpanded ? 'text-blue-400' : 'text-white'} />} 
+          <ActionButton
+            icon={<Maximize2 size={22} className={isExpanded ? 'text-blue-400' : 'text-white'} />}
             label="Tela"
-            onClick={() => setIsExpanded(!isExpanded)} 
+            onClick={() => setIsExpanded(!isExpanded)}
           />
         )}
 
         {/* Controle de Áudio (Apenas Vídeo) */}
         {post.type === 'video' && (
-          <ActionButton 
-            icon={isGlobalMuted ? <VolumeX size={24} className="text-white" /> : <Volume2 size={24} className="text-blue-400" />} 
+          <ActionButton
+            icon={isGlobalMuted ? <VolumeX size={24} className="text-white" /> : <Volume2 size={24} className="text-blue-400" />}
             label="Som"
-            onClick={onMuteToggle} 
+            alert={showAudioAlert}
+            onClick={onMuteToggle}
           />
         )}
 
         {/* Like */}
-        <ActionButton 
-          icon={<Heart size={26} className={liked ? 'fill-red-500 text-red-500 scale-110' : 'text-white'} />} 
+        <ActionButton
+          icon={<Heart size={26} className={liked ? 'fill-red-500 text-red-500 scale-110' : 'text-white'} />}
           label={post.likes.toString()}
           active={liked}
-          onClick={() => setLiked(!liked)} 
+          onClick={() => setLiked(!liked)}
         />
 
         {/* Chat / Comentários */}
-        <ActionButton 
-          icon={<MessageCircle size={24} className="text-white" />} 
+        <ActionButton
+          icon={<MessageCircle size={24} className="text-white" />}
           label="Chat"
-          onClick={() => {}} 
+          onClick={() => { }}
         />
 
         {/* Compartilhar */}
-        <ActionButton 
-          icon={<Share2 size={24} className="text-white" />} 
+        <ActionButton
+          icon={<Share2 size={24} className="text-white" />}
           label="Link"
           onClick={() => {
             if (navigator.share) {
-              navigator.share({ title: business.name, url: post.url }).catch(() => {});
+              navigator.share({ title: business.name, url: post.url }).catch(() => { });
             }
-          }} 
+          }}
         />
       </div>
     </div>
   );
 });
 
-const ActionButton: React.FC<{ icon: React.ReactNode; label: string; active?: boolean; onClick: () => void }> = ({ icon, label, active, onClick }) => (
+const ActionButton: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  alert?: boolean;
+  onClick: () => void
+}> = ({ icon, label, active, alert, onClick }) => (
   <button className="flex flex-col items-center gap-1.5 w-12 group" onClick={onClick}>
-    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-90 border border-white/5 backdrop-blur-md ${active ? 'bg-white/10 shadow-lg' : 'bg-black/20 group-hover:bg-black/40'}`}>
-       {icon}
+    <div className={`
+      relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all border
+      ${alert ? 'border-red-500/80 bg-red-500/20 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'border-white/5'}
+      ${active ? 'bg-white/10 shadow-lg' : !alert && 'bg-black/20 group-hover:bg-black/40'}
+      backdrop-blur-md active:scale-90
+    `}>
+      {icon}
+      {/* Small dot indicator for alert/notification if needed, but styling above is better */}
+      {alert && <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-black -translate-y-1/3 translate-x-1/3" />}
     </div>
-    <span className="text-[9px] font-black uppercase tracking-tighter text-white/70">{label}</span>
+    <span className={`text-[9px] font-black uppercase tracking-tighter ${alert ? 'text-red-400 animate-pulse' : 'text-white/70'}`}>{label}</span>
   </button>
 );
 

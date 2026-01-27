@@ -46,33 +46,21 @@
             padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
         }
 
+
         /* Container Principal Responsivo */
         .mobile-frame {
             width: 100%;
             height: var(--app-height);
-            margin: 0 auto;
+            margin: 0;
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             background-color: #000;
-            transition: background-color 0.3s ease;
         }
 
-        @media (min-width: 768px) {
-            .mobile-frame {
-                max-width: 420px;
-                border-left: 1px solid rgba(255,255,255,0.05);
-                border-right: 1px solid rgba(255,255,255,0.05);
-                box-shadow: 0 0 100px rgba(0,0,0,0.5);
-            }
-            body {
-                background-color: #0a0a0a;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-        }
+        /* Desktop Adjustments used to be here but were removing functionality */
+
 
         /* Aceleração de Hardware */
         .animate-gpu {
