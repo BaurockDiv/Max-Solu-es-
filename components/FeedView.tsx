@@ -81,20 +81,21 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowBu
         </div>
       </div>
 
-      <div className="transition-transform duration-300" style={{ transform: `translateY(${pullDist}px)` }}>
+      <div className="h-full transition-transform duration-300" style={{ transform: `translateY(${pullDist}px)` }}>
         {posts.map((post) => (
-          <FeedItem
-            key={post.id}
-            post={post}
-            onProfileClick={onProfileClick}
-            hideFollowButton={hideFollowButton}
-            isGlobalMuted={isGlobalMuted}
-            hasInteracted={hasInteracted}
-            onMuteToggle={() => {
-              setIsGlobalMuted(!isGlobalMuted);
-              setHasInteracted(true);
-            }}
-          />
+          <div key={post.id} className="h-full w-full snap-start snap-always shrink-0 overflow-hidden relative">
+            <FeedItem
+              post={post}
+              onProfileClick={onProfileClick}
+              hideFollowButton={hideFollowButton}
+              isGlobalMuted={isGlobalMuted}
+              hasInteracted={hasInteracted}
+              onMuteToggle={() => {
+                setIsGlobalMuted(!isGlobalMuted);
+                setHasInteracted(true);
+              }}
+            />
+          </div>
         ))}
       </div>
     </div>

@@ -69,9 +69,7 @@ const App: React.FC = () => {
   const fetchData = async () => {
     const { data, error } = await supabase.from('posts').select('*, business:businesses(*)').order('created_at', { ascending: false }).limit(40);
     if (!error && data) {
-      // Shuffling para dar sensação de novidade
-      const shuffled = [...data].sort(() => Math.random() - 0.5);
-      setAllPosts(shuffled.map((p: any) => ({ ...p, businessId: p.business_id, url: p.media_url, thumbnail: p.thumbnail_url, business: p.business })) as any);
+      setAllPosts(data.map((p: any) => ({ ...p, businessId: p.business_id, url: p.media_url, thumbnail: p.thumbnail_url, business: p.business })) as any);
     }
   };
 
