@@ -154,28 +154,25 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
       {/* Area de Conteúdo Scrollable */}
       <div className="flex-1 overflow-y-auto hide-scrollbar smooth-scroll animate-gpu touch-pan-y">
         <div className="p-6 pt-0 space-y-8 pb-32">
-          {/* Categorias - Vertical List (1 em 1) */}
+          {/* Categorias - Estilo Mini & Expansível */}
           <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
-              <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Segmentos Especializados</h2>
+              <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Segmentos ({categories.length})</h2>
+              {selectedCategory && (
+                <button onClick={() => setSelectedCategory(null)} className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Ver Todos</button>
+              )}
             </div>
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat === selectedCategory ? null : cat)}
-                  className={`flex items-center gap-4 p-5 rounded-3xl border-2 transition-all active:scale-[0.98] ${selectedCategory === cat ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 shadow-lg' : 'border-zinc-200 dark:border-zinc-900 bg-zinc-100 dark:bg-zinc-900 shadow-sm'}`}
+                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all active:scale-[0.95] ${selectedCategory === cat ? 'border-blue-600 bg-blue-600 text-white shadow-lg' : 'border-zinc-100 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900 shadow-sm'}`}
                 >
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${selectedCategory === cat ? 'bg-blue-600 text-white' : 'bg-white dark:bg-black text-zinc-400'}`}>
-                    <Grid size={24} />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <span className={`text-[11px] font-black uppercase tracking-tight ${selectedCategory === cat ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-950 dark:text-white'}`}>
-                      {cat}
-                    </span>
-                    <p className="text-[8px] font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Explorar Profissionais</p>
-                  </div>
-                  {selectedCategory === cat && <CheckCircle2 size={18} className="text-blue-600" />}
+                  <Grid size={selectedCategory === cat ? 18 : 14} className={selectedCategory === cat ? 'text-white' : 'text-zinc-400'} />
+                  <span className={`text-[8px] font-black uppercase tracking-tighter text-center mt-1.5 line-clamp-1 ${selectedCategory === cat ? 'text-white' : 'text-zinc-600 dark:text-zinc-400'}`}>
+                    {cat.split(' ')[0]}
+                  </span>
                 </button>
               ))}
             </div>

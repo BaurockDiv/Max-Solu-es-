@@ -27,7 +27,8 @@ import {
   EyeOff,
   ChevronDown,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  CheckCircle2
 } from 'lucide-react';
 import { Business, Category, MediaPost } from '../types';
 
@@ -53,8 +54,11 @@ const DAYS_OF_WEEK = [
 ];
 
 const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, userPosts, onUpdateBusiness, theme, onToggleTheme, onOpenDashboard, onPreviewProfile }) => {
-  const [activeView, setActiveView] = useState<'main' | 'edit-profile' | 'manage-posts'>('main');
+  const [activeView, setActiveView] = useState<'main' | 'edit-profile' | 'manage-posts' | 'edit-post'>('main');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingPost, setEditingPost] = useState<MediaPost | null>(null);
+  const [editCaption, setEditCaption] = useState('');
+  const [editFile, setEditFile] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -233,6 +237,70 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
     }
   };
 
+  const handleUpdatePost = async () => {
+    if (!editingPost) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('posts').update({
+        caption: editCaption
+      }).eq('id', editingPost.id);
+
+      if (error) throw error;
+
+      setSaveSuccess(true);
+      setTimeout(() => {
+        setSaveSuccess(false);
+        setEditingPost(null);
+        setActiveView('manage-posts');
+        onUpdateBusiness(initialBusiness!); // Atualiza lista
+      }, 1000);
+    } catch (err: any) {
+      alert("Erro ao atualizar: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (activeView === 'edit-post' && editingPost) {
+    return (
+      <div className="flex-1 flex flex-col bg-white dark:bg-black overflow-hidden animate-in slide-in-from-right duration-300">
+        <div className="p-6 pt-12 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
+          <button onClick={() => setActiveView('manage-posts')} className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-zinc-950 dark:text-white"><ArrowLeft size={18} /></button>
+          <h2 className="text-[11px] font-black uppercase tracking-widest text-zinc-950 dark:text-white">Editar Publicação</h2>
+          <div className="w-10" />
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          <div className="flex flex-col items-center">
+            <div className="w-full aspect-[4/5] max-w-[280px] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-zinc-100 dark:border-zinc-900">
+              <img src={editFile || 'https://picsum.photos/400/500'} className="w-full h-full object-cover" />
+            </div>
+            <p className="mt-4 text-[9px] font-black uppercase text-zinc-400 tracking-widest">{editingPost.type === 'video' ? 'Miniatura do Vídeo' : 'Foto Postada'}</p>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Legenda / Descrição</label>
+            <textarea
+              value={editCaption}
+              onChange={(e) => setEditCaption(e.target.value)}
+              className="w-full h-40 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-600 transition-all text-zinc-950 dark:text-white resize-none"
+              placeholder="Escreva algo sobre sua publicação..."
+            />
+          </div>
+
+          <button
+            onClick={handleUpdatePost}
+            disabled={isSaving}
+            className={`w-full h-16 rounded-[1.8rem] flex items-center justify-center gap-3 font-black text-[11px] uppercase tracking-widest transition-all active:scale-[0.98] ${saveSuccess ? 'bg-green-600 text-white' : 'bg-blue-600 text-white shadow-xl shadow-blue-500/20'}`}
+          >
+            {isSaving ? <Loader2 className="animate-spin" size={18} /> : saveSuccess ? <Check size={18} /> : <CheckCircle2 size={18} />}
+            {isSaving ? 'Salvando Alterações...' : saveSuccess ? 'Atualizado com Sucesso!' : 'Confirmar Edição'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (activeView === 'manage-posts') {
     return (
       <div className="flex-1 flex flex-col bg-white dark:bg-black overflow-hidden animate-in slide-in-from-right duration-300">
@@ -252,13 +320,26 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
                 <p className="text-[11px] font-bold text-zinc-950 dark:text-white truncate">{post.caption || 'Sem legenda'}</p>
                 <p className="text-[8px] font-black uppercase text-zinc-500 tracking-tighter mt-1">{post.type === 'video' ? 'Vídeo' : 'Foto'} • {post.likes} Likes</p>
               </div>
-              <button
-                onClick={() => handleDeletePost(post.id)}
-                disabled={deletingId === post.id}
-                className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/20 text-red-600 flex items-center justify-center active:scale-95 transition-all"
-              >
-                {deletingId === post.id ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setEditingPost(post);
+                    setEditCaption(post.caption || '');
+                    setEditFile(post.thumbnail_url || post.media_url);
+                    setActiveView('edit-post');
+                  }}
+                  className="w-10 h-10 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center active:scale-95 transition-all"
+                >
+                  <Settings size={16} />
+                </button>
+                <button
+                  onClick={() => handleDeletePost(post.id)}
+                  disabled={deletingId === post.id}
+                  className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/20 text-red-600 flex items-center justify-center active:scale-95 transition-all"
+                >
+                  {deletingId === post.id ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                </button>
+              </div>
             </div>
           )) : (
             <div className="text-center py-20 space-y-4 opacity-40">
