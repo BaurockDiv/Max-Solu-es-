@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
-import { Home, Search, Users, User, PlusSquare, LogIn } from 'lucide-react';
+import { Home, Search, Users, User, PlusSquare, LogIn, AlertTriangle, X } from 'lucide-react';
 import { ViewState, Business, MediaPost } from './types';
 import FeedView from './components/FeedView';
 import DiscoveryView from './components/DiscoveryView';
@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [allPosts, setAllPosts] = useState<MediaPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorModal, setErrorModal] = useState<{title: string, msg: string} | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('bizstream-theme') as 'light' | 'dark') || 'dark');
 
   useEffect(() => {
@@ -29,11 +30,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      if (session) {
-        fetchUserBusiness(session.user.id);
-        supabase.helpers.syncFollows(session.user.id);
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      if (currentSession) {
+        fetchUserBusiness(currentSession.user.id);
+        supabase.helpers.syncFollows(currentSession.user.id);
       }
       await fetchData();
       setLoading(false);
@@ -66,29 +67,30 @@ const App: React.FC = () => {
   };
 
   const handleNewPost = async (blob: Blob, type: 'video' | 'image', caption: string, onProgress: (p: number, s: string) => void) => {
-    if (!session || !userBusiness) return;
+    if (!session || !userBusiness) throw new Error("Crie um perfil profissional antes de postar.");
     
     try {
-      onProgress(10, 'Preparando Arquivo...');
-      const fileName = `${Date.now()}.${type === 'video' ? 'mp4' : 'jpg'}`;
-      const filePath = `${session.user.id}/${fileName}`;
+      onProgress(10, 'Otimizando...');
+      const fileExt = type === 'video' ? 'mp4' : 'jpg';
+      const mimeType = type === 'video' ? 'video/mp4' : 'image/jpeg';
+      const fileName = `posts/${session.user.id}-${Date.now()}.${fileExt}`;
+      const arrayBuffer = await blob.arrayBuffer();
       
-      onProgress(30, 'Enviando para Nuvem...');
+      onProgress(30, 'Enviando arquivo...');
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('media')
-        .upload(filePath, blob, { cacheControl: '3600', upsert: false });
+        .upload(fileName, arrayBuffer, { contentType: mimeType, upsert: true });
         
       if (uploadError) throw uploadError;
       
-      onProgress(70, 'Gerando Links...');
+      onProgress(70, 'Configurando post...');
       const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(uploadData.path);
       
-      onProgress(90, 'Finalizando...');
       const { error: dbError } = await supabase.from('posts').insert({
         business_id: userBusiness.id,
         type: type,
         media_url: publicUrl,
-        caption: caption || "Publicação BizStream",
+        caption: caption || "",
         thumbnail_url: type === 'image' ? publicUrl : null
       });
       
@@ -97,16 +99,8 @@ const App: React.FC = () => {
       await fetchData();
       setActiveTab('feed');
     } catch (err: any) {
-      throw new Error("Falha no upload: " + err.message);
-    }
-  };
-
-  const navigateToProfile = (businessId: string) => {
-    const biz = allPosts.find(p => p.businessId === businessId || p.business?.id === businessId)?.business;
-    if (biz) {
-      setSelectedBusiness(biz as any);
-      setLastTab(activeTab);
-      setActiveTab('profile');
+      console.error("Falha no Post:", err);
+      throw err;
     }
   };
 
@@ -115,9 +109,18 @@ const App: React.FC = () => {
       return <AuthView onBack={() => setActiveTab('feed')} />;
     }
     switch (activeTab) {
-      case 'feed': return <FeedView posts={allPosts} onProfileClick={navigateToProfile} />;
-      case 'discovery': return <DiscoveryView onBusinessClick={navigateToProfile} />;
-      case 'following': return <FollowingView onProfileClick={navigateToProfile} />;
+      case 'feed': return <FeedView posts={allPosts} onProfileClick={(id) => {
+        const biz = allPosts.find(p => p.businessId === id || p.business?.id === id)?.business;
+        if (biz) { setSelectedBusiness(biz as any); setLastTab('feed'); setActiveTab('profile'); }
+      }} />;
+      case 'discovery': return <DiscoveryView onBusinessClick={(id) => {
+        const biz = allPosts.find(p => p.businessId === id || p.business?.id === id)?.business;
+        if (biz) { setSelectedBusiness(biz as any); setLastTab('discovery'); setActiveTab('profile'); }
+      }} />;
+      case 'following': return <FollowingView onProfileClick={(id) => {
+        const biz = allPosts.find(p => p.businessId === id || p.business?.id === id)?.business;
+        if (biz) { setSelectedBusiness(biz as any); setLastTab('following'); setActiveTab('profile'); }
+      }} />;
       case 'profile': return <ProfileView business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} />;
       case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
       case 'me': return <MeView session={session} business={userBusiness} onUpdateBusiness={setUserBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} />;
@@ -130,9 +133,25 @@ const App: React.FC = () => {
 
   return (
     <div className={`mobile-frame transition-colors duration-500 ${theme === 'dark' ? 'dark bg-black text-white' : 'bg-white text-zinc-950'} flex flex-col h-screen overflow-hidden`}>
-      <main className="flex-1 overflow-y-auto hide-scrollbar relative">{renderContent()}</main>
+      <main className="flex-1 overflow-y-auto hide-scrollbar relative z-0">{renderContent()}</main>
+      
+      {errorModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 w-full rounded-[2rem] p-8 shadow-2xl border border-red-500/20">
+             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-2xl flex items-center justify-center text-red-600 mb-6">
+                <AlertTriangle size={32} />
+             </div>
+             <h3 className="text-xl font-black uppercase mb-2 tracking-tight">{errorModal.title}</h3>
+             <p className="text-zinc-500 text-sm leading-relaxed mb-8">{errorModal.msg}</p>
+             <button onClick={() => setErrorModal(null)} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                <X size={16} /> Fechar Aviso
+             </button>
+          </div>
+        </div>
+      )}
+
       {activeTab !== 'record' && (
-        <nav className={`h-[84px] border-t ${theme === 'dark' ? 'border-zinc-900 bg-black' : 'border-zinc-100 bg-white'} flex items-center justify-around px-6 z-50 safe-area-bottom`}>
+        <nav className={`h-[84px] border-t shrink-0 ${theme === 'dark' ? 'border-zinc-900 bg-black/95' : 'border-zinc-100 bg-white/95'} backdrop-blur-md flex items-center justify-around px-6 z-[150] safe-area-bottom sticky bottom-0`}>
           <NavButton active={activeTab === 'feed'} icon={<Home size={24} />} label="Início" onClick={() => setActiveTab('feed')} theme={theme} />
           <NavButton active={activeTab === 'discovery'} icon={<Search size={24} />} label="Busca" onClick={() => setActiveTab('discovery')} theme={theme} />
           <div onClick={() => setActiveTab('record')} className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all cursor-pointer"><PlusSquare size={26} /></div>
