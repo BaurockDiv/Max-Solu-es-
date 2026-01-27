@@ -36,6 +36,7 @@ interface MeViewProps {
   theme: 'light' | 'dark';
   onToggleTheme: (theme: 'light' | 'dark') => void;
   onOpenDashboard: () => void;
+  onPreviewProfile?: (id: string) => void;
 }
 
 const DAYS_OF_WEEK = [
@@ -48,7 +49,7 @@ const DAYS_OF_WEEK = [
   { id: 'Sab', label: 'S' },
 ];
 
-const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onUpdateBusiness, theme, onToggleTheme, onOpenDashboard }) => {
+const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onUpdateBusiness, theme, onToggleTheme, onOpenDashboard, onPreviewProfile }) => {
   const [activeView, setActiveView] = useState<'main' | 'edit-profile'>('main');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -218,15 +219,15 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
       {/* VIEW PRINCIPAL */}
       <div className={`flex-1 flex flex-col overflow-y-auto hide-scrollbar transition-all duration-300 ${activeView === 'edit-profile' ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
         <div className="px-6 py-14 flex flex-col items-center text-center space-y-4 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-300 dark:border-zinc-800 rounded-b-[4rem] flex-shrink-0">
-          <div className="relative">
+          <div className="relative group cursor-pointer active:scale-95 transition-all" onClick={() => initialBusiness && onPreviewProfile?.(initialBusiness.id)}>
             <div className="w-24 h-24 rounded-[2.5rem] p-1 bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-2xl">
               <img src={initialBusiness?.logo || 'https://picsum.photos/200/200'} className="w-full h-full rounded-[2.3rem] object-cover border-[3px] border-white dark:border-black" alt="Profile" />
             </div>
             <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white border-4 border-white dark:border-zinc-900">
-              <TrendingUp size={14} />
+              <Eye size={14} />
             </div>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 cursor-pointer active:opacity-70 transition-all" onClick={() => initialBusiness && onPreviewProfile?.(initialBusiness.id)}>
             <h1 className="text-2xl font-black text-zinc-950 dark:text-white uppercase tracking-tighter italic leading-tight">{initialBusiness?.name || "Max Professional"}</h1>
             <p className="text-[10px] text-zinc-600 dark:text-zinc-400 font-black uppercase tracking-[0.3em]">{session.user.email}</p>
           </div>
