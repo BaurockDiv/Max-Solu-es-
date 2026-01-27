@@ -20,7 +20,7 @@ const App: React.FC = () => {
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [allPosts, setAllPosts] = useState<MediaPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorModal, setErrorModal] = useState<{title: string, msg: string, isSql?: boolean} | null>(null);
+  const [errorModal, setErrorModal] = useState<{ title: string, msg: string, isSql?: boolean } | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('maxcompany-theme') as 'light' | 'dark') || 'dark');
 
   useEffect(() => {
@@ -57,11 +57,11 @@ const App: React.FC = () => {
   const fetchUserBusiness = async (userId: string) => {
     const { data, error } = await supabase.from('businesses').select('*').eq('owner_id', userId).single();
     if (error && error.message.includes('column')) {
-       setErrorModal({
-         title: "Banco de Dados Incompleto",
-         msg: "As colunas de contato (email, whatsapp, phone) não existem no seu Supabase. Execute o script SQL para corrigir.",
-         isSql: true
-       });
+      setErrorModal({
+        title: "Banco de Dados Incompleto",
+        msg: "As colunas de contato (email, whatsapp, phone) não existem no seu Supabase. Execute o script SQL para corrigir.",
+        isSql: true
+      });
     }
     if (data) setUserBusiness(data as any);
   };
@@ -78,36 +78,52 @@ const App: React.FC = () => {
     fetchData();
   };
 
-  const handleNewPost = async (blob: Blob, type: 'video' | 'image', caption: string, onProgress: (p: number, s: string) => void) => {
+  const handleNewPost = async (blob: Blob, type: 'video' | 'image', caption: string, onProgress: (p: number, s: string) => void, thumbnailBlob?: Blob) => {
     if (!session || !userBusiness) throw new Error("Crie um perfil profissional antes de postar.");
-    
+
     try {
       onProgress(10, 'Otimizando...');
       const fileExt = type === 'video' ? 'mp4' : 'jpg';
       const mimeType = type === 'video' ? 'video/mp4' : 'image/jpeg';
       const fileName = `posts/${session.user.id}-${Date.now()}.${fileExt}`;
       const arrayBuffer = await blob.arrayBuffer();
-      
+
       onProgress(30, 'Enviando arquivo...');
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('media')
         .upload(fileName, arrayBuffer, { contentType: mimeType, upsert: true });
-        
+
       if (uploadError) throw uploadError;
-      
-      onProgress(70, 'Configurando post...');
       const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(uploadData.path);
-      
+
+      // Upload Thumbnail if exists (for videos)
+      let thumbUrl = null;
+      if (thumbnailBlob) {
+        onProgress(50, 'Enviando miniatura...');
+        const thumbName = `thumbs/${session.user.id}-${Date.now()}.jpg`;
+        const thumbBuffer = await thumbnailBlob.arrayBuffer();
+        const { data: thumbData, error: thumbError } = await supabase.storage
+          .from('media')
+          .upload(thumbName, thumbBuffer, { contentType: 'image/jpeg', upsert: true });
+
+        if (!thumbError) {
+          const { data: { publicUrl: tUrl } } = supabase.storage.from('media').getPublicUrl(thumbData.path);
+          thumbUrl = tUrl;
+        }
+      }
+
+      onProgress(80, 'Finalizando...');
+
       const { error: dbError } = await supabase.from('posts').insert({
         business_id: userBusiness.id,
         type: type,
         media_url: publicUrl,
         caption: caption || "",
-        thumbnail_url: type === 'image' ? publicUrl : null
+        thumbnail_url: type === 'image' ? publicUrl : thumbUrl
       });
-      
+
       if (dbError) throw dbError;
-      
+
       await fetchData();
       setActiveTab('feed');
     } catch (err: any) {
@@ -148,18 +164,18 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-hidden relative z-0 flex flex-col">
         {renderContent()}
       </main>
-      
+
       {errorModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-[340px] rounded-[2.5rem] p-8 shadow-2xl border border-red-500/20 animate-in zoom-in duration-300">
-             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 ${errorModal.isSql ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
-                {errorModal.isSql ? <Database size={32} /> : <AlertTriangle size={32} />}
-             </div>
-             <h3 className="text-xl font-black uppercase mb-2 tracking-tight">{errorModal.title}</h3>
-             <p className="text-zinc-500 text-[11px] leading-relaxed mb-8 font-medium">{errorModal.msg}</p>
-             <button onClick={() => setErrorModal(null)} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
-                <X size={16} /> Entendi
-             </button>
+            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 ${errorModal.isSql ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+              {errorModal.isSql ? <Database size={32} /> : <AlertTriangle size={32} />}
+            </div>
+            <h3 className="text-xl font-black uppercase mb-2 tracking-tight">{errorModal.title}</h3>
+            <p className="text-zinc-500 text-[11px] leading-relaxed mb-8 font-medium">{errorModal.msg}</p>
+            <button onClick={() => setErrorModal(null)} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <X size={16} /> Entendi
+            </button>
           </div>
         </div>
       )}
@@ -180,7 +196,7 @@ const App: React.FC = () => {
 const NavButton = ({ active, icon, label, onClick, theme }: any) => (
   <button onClick={onClick} className={`flex flex-col items-center justify-center gap-1.5 w-14 h-14 transition-all duration-300 ${active ? 'text-blue-600' : theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
     <div className={`transition-transform duration-300 ${active ? 'scale-110' : 'scale-100'}`}>
-        {icon}
+      {icon}
     </div>
     <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${active ? 'opacity-100' : 'opacity-60'}`}>{label}</span>
   </button>

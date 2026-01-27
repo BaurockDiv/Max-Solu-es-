@@ -1,14 +1,14 @@
 
 import React, { useState } from 'react';
-import { 
-  ArrowLeft, 
-  MessageCircle, 
-  Phone, 
-  Mail, 
-  Globe, 
-  MapPin, 
-  Clock, 
-  CheckCircle2, 
+import {
+  ArrowLeft,
+  MessageCircle,
+  Phone,
+  Mail,
+  Globe,
+  MapPin,
+  Clock,
+  CheckCircle2,
   ExternalLink,
   Share2,
   LayoutGrid,
@@ -103,7 +103,15 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack }) =>
             <div className="grid grid-cols-3 gap-1 animate-in fade-in duration-300">
               {posts.length > 0 ? posts.map(post => (
                 <div key={post.id} onClick={() => setSelectedPost(post)} className="aspect-[3/4] bg-zinc-50 dark:bg-zinc-950 overflow-hidden rounded-xl group relative cursor-pointer active:scale-95 transition-all shadow-sm">
-                  <img src={post.thumbnail_url} className="w-full h-full object-cover" />
+                  {post.thumbnail_url ? (
+                    <img src={post.thumbnail_url} className="w-full h-full object-cover" />
+                  ) : (
+                    post.type === 'video' ? (
+                      <video src={`${post.media_url}#t=0.5`} className="w-full h-full object-cover pointer-events-none" preload="metadata" muted />
+                    ) : (
+                      <img src={post.media_url} className="w-full h-full object-cover" />
+                    )
+                  )}
                   {post.type === 'video' && <div className="absolute inset-0 flex items-center justify-center bg-black/5"><Play size={18} className="text-white fill-white/10" /></div>}
                 </div>
               )) : (
@@ -134,8 +142,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack }) =>
                   <div className="flex flex-col">
                     <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Funcionamento</span>
                     <div className="mt-0.5">
-                       <p className="text-[10px] font-black text-black dark:text-white uppercase leading-tight">{daysPart || "Dias a Combinar"}</p>
-                       <p className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase mt-0.5">{timePart || "09:00 - 18:00"}</p>
+                      <p className="text-[10px] font-black text-black dark:text-white uppercase leading-tight">{daysPart || "Dias a Combinar"}</p>
+                      <p className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase mt-0.5">{timePart || "09:00 - 18:00"}</p>
                     </div>
                   </div>
                 </div>

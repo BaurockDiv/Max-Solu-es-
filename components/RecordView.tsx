@@ -3,7 +3,7 @@ import { X, Send, ImageIcon, RefreshCw, ChevronRight, Loader2, AlertTriangle, Up
 
 interface RecordViewProps {
   onCancel: () => void;
-  onPost: (blob: Blob, type: 'video' | 'image', caption: string, onProgress: (p: number, stage: string) => void) => Promise<void>;
+  onPost: (blob: Blob, type: 'video' | 'image', caption: string, onProgress: (p: number, stage: string) => void, thumbnail?: Blob) => Promise<void>;
 }
 
 const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
@@ -12,6 +12,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isRecording, setIsRecording] = useState(false);
   const [mediaBlob, setMediaBlob] = useState<Blob | null>(null);
+  const [thumbnailBlob, setThumbnailBlob] = useState<Blob | undefined>(undefined);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [caption, setCaption] = useState('');
@@ -19,11 +20,12 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [error, setError] = useState<string | null>(null);
   const [flashLevel, setFlashLevel] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
-  const [quality, setQuality] = useState<'high' | 'balanced'>('balanced'); // Default to Balanced (720p)
+  const [quality, setQuality] = useState<'ultra' | 'high' | 'balanced'>('balanced'); // Default to Balanced (720p)
 
   const qualityConfig = {
-    high: { width: 1920, height: 1080, bitrate: 2500000 },
-    balanced: { width: 1280, height: 720, bitrate: 1500000 }
+    ultra: { width: 3840, height: 2160, bitrate: 8000000 },
+    high: { width: 1920, height: 1080, bitrate: 4000000 },
+    balanced: { width: 1280, height: 720, bitrate: 2000000 }
   };
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -33,6 +35,26 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const timerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const generateThumbnail = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        if (facingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          if (blob) setThumbnailBlob(blob);
+        }, 'image/jpeg', 0.7);
+      }
+    }
+  };
 
   useEffect(() => {
     if (step === 'capture') {
@@ -115,7 +137,8 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
 
     const options = {
       mimeType,
-      videoBitsPerSecond: qualityConfig[quality].bitrate
+      videoBitsPerSecond: qualityConfig[quality].bitrate,
+      audioBitsPerSecond: 128000 // 128kbps para áudio cristalino
     };
 
     try {
@@ -139,6 +162,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   };
 
   const stopRecording = () => {
+    generateThumbnail(); // Captura frame final como thumb
     if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
     if (timerRef.current) clearInterval(timerRef.current);
     setIsRecording(false);
@@ -190,9 +214,13 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
             <div className="space-y-2">
               <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest pl-2">Qualidade de Vídeo</p>
               <div className="flex flex-col gap-2">
+                <button onClick={() => { setQuality('ultra'); setShowSettings(false); }} className={`p-4 rounded-xl text-left border transition-all ${quality === 'ultra' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-black/20 border-white/5 text-zinc-400'}`}>
+                  <span className="block font-bold text-sm">Ultra (4K)</span>
+                  <span className="text-[10px] opacity-60">Qualidade máxima. Requer dispositivo potente.</span>
+                </button>
                 <button onClick={() => { setQuality('high'); setShowSettings(false); }} className={`p-4 rounded-xl text-left border transition-all ${quality === 'high' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-black/20 border-white/5 text-zinc-400'}`}>
                   <span className="block font-bold text-sm">Alta (1080p)</span>
-                  <span className="text-[10px] opacity-60">Melhor qualidade, arquivo maior.</span>
+                  <span className="text-[10px] opacity-60">Melhor equilíbrio.</span>
                 </button>
                 <button onClick={() => { setQuality('balanced'); setShowSettings(false); }} className={`p-4 rounded-xl text-left border transition-all ${quality === 'balanced' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-black/20 border-white/5 text-zinc-400'}`}>
                   <span className="block font-bold text-sm">Suave (720p)</span>
@@ -245,12 +273,25 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
           </>
         ) : (
           <div className="w-full h-full bg-black relative">
-            {captureMode === 'video' ? (
-              <video src={previewUrl!} autoPlay loop playsInline className="w-full h-full object-contain" />
-            ) : (
-              <img src={previewUrl!} className="w-full h-full object-contain" />
-            )}
-            <button onClick={() => setStep('capture')} className="absolute top-4 left-4 z-50 bg-black/50 p-2 rounded-full text-white"><X /></button>
+            {/* Blurred Background */}
+            <div className="absolute inset-0 z-0 opacity-30 blur-3xl scale-110">
+              {captureMode === 'video' ? (
+                <video src={previewUrl!} className="w-full h-full object-cover" />
+              ) : (
+                <img src={previewUrl!} className="w-full h-full object-cover" />
+              )}
+            </div>
+
+            {/* Main Content */}
+            <div className="relative z-10 w-full h-full flex items-center justify-center p-8 pb-32">
+              {captureMode === 'video' ? (
+                <video src={previewUrl!} autoPlay loop playsInline className="max-w-full max-h-full rounded-3xl shadow-2xl border border-white/10" />
+              ) : (
+                <img src={previewUrl!} className="max-w-full max-h-full rounded-3xl shadow-2xl border border-white/10" />
+              )}
+            </div>
+
+            <button onClick={() => setStep('capture')} className="absolute top-4 left-4 z-50 bg-black/50 p-2 rounded-full text-white backdrop-blur"><X /></button>
           </div>
         )}
       </div>
@@ -282,26 +323,27 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
             </div>
           </>
         ) : (
-          <div className="w-full max-w-md space-y-4 animate-in slide-in-from-bottom duration-300">
-            <textarea
-              placeholder="Escreva uma legenda..."
-              className="w-full bg-zinc-900/90 rounded-2xl p-4 text-white text-sm h-24 outline-none border border-white/10 focus:border-blue-500 transition-all resize-none placeholder:text-zinc-600"
-              value={caption}
-              onChange={e => setCaption(e.target.value)}
-            />
-            <div className="flex gap-3">
-              <button
-                disabled={!!uploadStatus}
-                onClick={async () => {
-                  setUploadStatus({ progress: 10, stage: 'Publicando...' });
-                  await onPost(mediaBlob!, captureMode, caption, (p, s) => setUploadStatus({ progress: p, stage: s }));
-                  onCancel();
-                }}
-                className="flex-1 h-14 bg-blue-600 rounded-2xl text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
-              >
-                {uploadStatus ? <Loader2 className="animate-spin" /> : <Send size={18} />}
-                {uploadStatus ? 'Enviando...' : 'Publicar'}
-              </button>
+          <div className="w-full max-w-md space-y-4 animate-in slide-in-from-bottom duration-500 absolute bottom-8 left-0 right-0 px-6 z-50">
+            <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/10 p-1 rounded-[2rem] shadow-2xl">
+              <div className="flex items-center gap-3 pr-2">
+                <textarea
+                  placeholder="Escreva uma legenda incrível..."
+                  className="flex-1 bg-transparent text-white text-sm h-14 py-4 px-6 outline-none resize-none placeholder:text-zinc-500 font-medium"
+                  value={caption}
+                  onChange={e => setCaption(e.target.value)}
+                />
+                <button
+                  disabled={!!uploadStatus}
+                  onClick={async () => {
+                    setUploadStatus({ progress: 10, stage: 'Publicando...' });
+                    await onPost(mediaBlob!, captureMode, caption, (p, s) => setUploadStatus({ progress: p, stage: s }), thumbnailBlob);
+                    onCancel();
+                  }}
+                  className="w-12 h-12 bg-blue-600 rounded-full text-white shadow-lg shadow-blue-600/20 active:scale-90 transition-all flex items-center justify-center disabled:opacity-50 disabled:grayscale"
+                >
+                  {uploadStatus ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} className="ml-0.5" />}
+                </button>
+              </div>
             </div>
           </div>
         )}
