@@ -36,6 +36,9 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
+            background-color: #0b0b0b;
+            display: flex;
+            justify-content: center;
         }
 
         /* Scroll suave e performance */
@@ -63,15 +66,21 @@
         /* Container Principal Responsivo */
         .mobile-frame {
             width: 100%;
+            max-width: 500px;
             height: var(--app-height);
-            margin: 0;
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            background: #000;
+            box-shadow: 0 0 100px rgba(0, 0, 0, 0.8);
         }
 
-        /* Desktop Adjustments used to be here but were removing functionality */
+        @media (max-height: 600px) and (orientation: landscape) {
+            .mobile-frame {
+                max-width: 100%;
+            }
+        }
 
 
         /* Aceleração de Hardware */

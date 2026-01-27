@@ -54,8 +54,15 @@ const FeedItem: React.FC<{
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
   const [liked, setLiked] = useState(false);
   const business = post.business;
+
+  useEffect(() => {
+    const handleResize = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
@@ -85,10 +92,10 @@ const FeedItem: React.FC<{
           loop
           muted={isGlobalMuted}
           playsInline
-          className={`h-full w-full transition-all duration-700 ease-in-out ${isExpanded ? 'object-contain' : 'object-cover'}`}
+          className={`h-full w-full transition-all duration-700 ease-in-out ${isExpanded || isLandscape ? 'object-contain' : 'object-cover'}`}
         />
       ) : (
-        <img src={post.url} className="h-full w-full object-cover" />
+        <img src={post.url} className={`h-full w-full transition-all duration-700 ease-in-out ${isExpanded || isLandscape ? 'object-contain' : 'object-cover'}`} />
       )}
 
       <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 pointer-events-none z-20" />
