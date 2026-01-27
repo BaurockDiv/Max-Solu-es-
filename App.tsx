@@ -1,14 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
-import { 
-  Home, 
-  Search, 
-  Users, 
-  User, 
-  PlusSquare,
-  LogIn
-} from 'lucide-react';
+import { Home, Search, Users, User, PlusSquare, LogIn } from 'lucide-react';
 import { ViewState, Business, MediaPost } from './types';
 import FeedView from './components/FeedView';
 import DiscoveryView from './components/DiscoveryView';
@@ -27,230 +20,134 @@ const App: React.FC = () => {
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [allPosts, setAllPosts] = useState<MediaPost[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('bizstream-theme');
-    return (saved as 'light' | 'dark') || 'dark';
-  });
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('bizstream-theme') as 'light' | 'dark') || 'dark');
 
   useEffect(() => {
     localStorage.setItem('bizstream-theme', theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      setSession(currentSession);
-      
-      if (currentSession) {
-        await fetchUserBusiness(currentSession.user.id);
-        await supabase.helpers.syncFollows(currentSession.user.id);
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (session) {
+        fetchUserBusiness(session.user.id);
+        supabase.helpers.syncFollows(session.user.id);
       }
-      
       await fetchData();
       setLoading(false);
     };
+    init();
 
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession);
-      if (newSession) {
-        await fetchUserBusiness(newSession.user.id);
-        await supabase.helpers.syncFollows(newSession.user.id);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        fetchUserBusiness(session.user.id);
+        supabase.helpers.syncFollows(session.user.id);
       } else {
         setUserBusiness(null);
         setActiveTab('feed');
       }
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
   const fetchUserBusiness = async (userId: string) => {
-    const { data } = await supabase
-      .from('businesses')
-      .select('*')
-      .eq('owner_id', userId)
-      .single();
+    const { data } = await supabase.from('businesses').select('*').eq('owner_id', userId).single();
     if (data) setUserBusiness(data as any);
   };
 
   const fetchData = async () => {
-    try {
-      const { data: posts, error } = await supabase
-        .from('posts')
-        .select(`*, business:businesses(*)`)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-
-      if (posts) {
-        const normalized = posts.map((p: any) => ({
-          ...p,
-          businessId: p.business_id,
-          url: p.media_url,
-          thumbnail: p.thumbnail_url,
-          business: p.business
-        }));
-        setAllPosts(normalized as any);
-      }
-    } catch (err) {
-      console.error("Erro ao carregar feed real:", err);
+    const { data, error } = await supabase.from('posts').select('*, business:businesses(*)').order('created_at', { ascending: false }).limit(20);
+    if (!error && data) {
+      setAllPosts(data.map((p: any) => ({ ...p, businessId: p.business_id, url: p.media_url, thumbnail: p.thumbnail_url, business: p.business })) as any);
     }
   };
 
-  const handleUpdateBusiness = (updatedBiz: Business) => {
-    setUserBusiness(updatedBiz);
-    setAllPosts(current => current.map(post => {
-      if (post.businessId === updatedBiz.id || post.business?.id === updatedBiz.id) {
-        return { ...post, business: updatedBiz };
-      }
-      return post;
-    }));
-  };
-
-  const handleNewPost = async (mediaBlob: Blob, type: 'video' | 'image', caption: string) => {
-    if (!session) return;
+  const handleNewPost = async (blob: Blob, type: 'video' | 'image', caption: string, onProgress: (p: number, s: string) => void) => {
+    if (!session || !userBusiness) return;
+    
     try {
-      let bizId = userBusiness?.id;
-      if (!bizId) {
-        const { data: biz } = await supabase.from('businesses').select('id').eq('owner_id', session.user.id).single();
-        bizId = biz?.id;
-      }
-      if (!bizId) {
-        alert("Erro: Crie um perfil de negócio primeiro.");
-        return;
-      }
-      
+      onProgress(10, 'Preparando Arquivo...');
       const fileName = `${Date.now()}.${type === 'video' ? 'mp4' : 'jpg'}`;
       const filePath = `${session.user.id}/${fileName}`;
       
+      onProgress(30, 'Enviando para Nuvem...');
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('media')
-        .upload(filePath, mediaBlob);
+        .upload(filePath, blob, { cacheControl: '3600', upsert: false });
         
       if (uploadError) throw uploadError;
       
+      onProgress(70, 'Gerando Links...');
       const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(uploadData.path);
       
+      onProgress(90, 'Finalizando...');
       const { error: dbError } = await supabase.from('posts').insert({
-        business_id: bizId,
+        business_id: userBusiness.id,
         type: type,
         media_url: publicUrl,
-        caption: caption || "Publicação sem legenda",
-        cta_text: "Saiba Mais",
-        thumbnail_url: type === 'image' ? publicUrl : null // Simplificação para o POC
+        caption: caption || "Publicação BizStream",
+        thumbnail_url: type === 'image' ? publicUrl : null
       });
       
-      if (!dbError) {
-        await fetchData();
-        setActiveTab('feed');
-      }
+      if (dbError) throw dbError;
+      
+      await fetchData();
+      setActiveTab('feed');
     } catch (err: any) {
-      alert("Erro ao publicar: " + err.message);
+      throw new Error("Falha no upload: " + err.message);
     }
   };
 
   const navigateToProfile = (businessId: string) => {
-    const post = allPosts.find(p => p.businessId === businessId || p.business?.id === businessId);
-    if (post?.business) {
-      setSelectedBusiness(post.business as any);
+    const biz = allPosts.find(p => p.businessId === businessId || p.business?.id === businessId)?.business;
+    if (biz) {
+      setSelectedBusiness(biz as any);
       setLastTab(activeTab);
       setActiveTab('profile');
     }
   };
 
-  const changeTab = (tab: ViewState) => {
-    setLastTab(activeTab);
-    setActiveTab(tab);
-  };
-
   const renderContent = () => {
-    if (!session && (activeTab === 'me' || activeTab === 'following' || activeTab === 'record' || activeTab === 'dashboard')) {
+    if (!session && ['me', 'following', 'record', 'dashboard'].includes(activeTab)) {
       return <AuthView onBack={() => setActiveTab('feed')} />;
     }
     switch (activeTab) {
-      case 'feed':
-        return <FeedView posts={allPosts} onProfileClick={navigateToProfile} />;
-      case 'discovery':
-        return <DiscoveryView onBusinessClick={navigateToProfile} />;
-      case 'following':
-        return <FollowingView onProfileClick={navigateToProfile} />;
-      case 'profile':
-        return (
-          <ProfileView 
-            business={selectedBusiness || ({} as any)} 
-            posts={allPosts.filter(p => (p.businessId === selectedBusiness?.id || p.business?.id === selectedBusiness?.id))}
-            onBack={() => setActiveTab(lastTab)} 
-          />
-        );
-      case 'dashboard':
-        return (
-          <div className="h-full bg-white dark:bg-black overflow-y-auto">
-            <button onClick={() => setActiveTab('me')} className="m-6 p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900 text-[10px] font-black uppercase tracking-widest text-zinc-900 dark:text-white">Voltar ao Perfil</button>
-            <DashboardView business={userBusiness} userPosts={allPosts.filter(p => (p.businessId === userBusiness?.id || p.business?.id === userBusiness?.id))} />
-          </div>
-        );
-      case 'me':
-        return (
-          <MeView 
-            session={session} 
-            business={userBusiness} 
-            onUpdateBusiness={handleUpdateBusiness}
-            theme={theme}
-            onToggleTheme={(t) => setTheme(t)}
-            onOpenDashboard={() => setActiveTab('dashboard')}
-          />
-        );
-      case 'record':
-        return <RecordView onCancel={() => setActiveTab('feed')} onPost={handleNewPost} />;
-      default:
-        return <FeedView posts={allPosts} onProfileClick={navigateToProfile} />;
+      case 'feed': return <FeedView posts={allPosts} onProfileClick={navigateToProfile} />;
+      case 'discovery': return <DiscoveryView onBusinessClick={navigateToProfile} />;
+      case 'following': return <FollowingView onProfileClick={navigateToProfile} />;
+      case 'profile': return <ProfileView business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} />;
+      case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
+      case 'me': return <MeView session={session} business={userBusiness} onUpdateBusiness={setUserBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} />;
+      case 'record': return <RecordView onCancel={() => setActiveTab('feed')} onPost={handleNewPost} />;
+      default: return null;
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-black text-white font-black tracking-[0.4em] animate-pulse uppercase">BizStream</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center bg-black text-blue-500 font-black tracking-[0.5em] animate-pulse">BIZSTREAM</div>;
 
   return (
     <div className={`mobile-frame transition-colors duration-500 ${theme === 'dark' ? 'dark bg-black text-white' : 'bg-white text-zinc-950'} flex flex-col h-screen overflow-hidden`}>
-      <main className="flex-1 overflow-y-auto hide-scrollbar relative">
-        {renderContent()}
-      </main>
-
+      <main className="flex-1 overflow-y-auto hide-scrollbar relative">{renderContent()}</main>
       {activeTab !== 'record' && (
-        <nav className={`h-[84px] border-t transition-colors duration-500 ${theme === 'dark' ? 'border-zinc-900 bg-black' : 'border-zinc-100 bg-white'} flex items-center justify-around px-6 z-50`}>
-          <NavButton active={activeTab === 'feed'} icon={<Home size={24} />} label="Feed" onClick={() => changeTab('feed')} theme={theme} />
-          <NavButton active={activeTab === 'discovery'} icon={<Search size={24} />} label="Buscar" onClick={() => changeTab('discovery')} theme={theme} />
-          
-          <div className="flex flex-col items-center justify-center">
-            <div 
-              onClick={() => changeTab('record')} 
-              className={`w-[58px] h-[58px] rounded-[1.6rem] bg-blue-600 flex items-center justify-center text-white shadow-[0_8px_30px_rgb(37,99,235,0.3)] active:scale-90 transition-all cursor-pointer`}
-            >
-              <PlusSquare size={28} />
-            </div>
-          </div>
-
-          <NavButton active={activeTab === 'following'} icon={<Users size={24} />} label="Rede" onClick={() => changeTab('following')} theme={theme} />
-          <NavButton active={activeTab === 'me'} icon={session ? <User size={24} /> : <LogIn size={24} />} label={session ? "Eu" : "Entrar"} onClick={() => changeTab('me')} theme={theme} />
+        <nav className={`h-[84px] border-t ${theme === 'dark' ? 'border-zinc-900 bg-black' : 'border-zinc-100 bg-white'} flex items-center justify-around px-6 z-50 safe-area-bottom`}>
+          <NavButton active={activeTab === 'feed'} icon={<Home size={24} />} label="Início" onClick={() => setActiveTab('feed')} theme={theme} />
+          <NavButton active={activeTab === 'discovery'} icon={<Search size={24} />} label="Busca" onClick={() => setActiveTab('discovery')} theme={theme} />
+          <div onClick={() => setActiveTab('record')} className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all cursor-pointer"><PlusSquare size={26} /></div>
+          <NavButton active={activeTab === 'following'} icon={<Users size={24} />} label="Rede" onClick={() => setActiveTab('following')} theme={theme} />
+          <NavButton active={activeTab === 'me'} icon={session ? <User size={24} /> : <LogIn size={24} />} label="Perfil" onClick={() => setActiveTab('me')} theme={theme} />
         </nav>
       )}
     </div>
   );
 };
 
-const NavButton: React.FC<{ active: boolean; icon: React.ReactNode; label: string; onClick: () => void; theme: 'light' | 'dark' }> = ({ active, icon, label, onClick, theme }) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center space-y-1.5 w-14 transition-all ${active ? 'text-blue-600' : theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
-    <div className={`transition-all duration-300 ${active ? 'scale-110 -translate-y-0.5' : ''}`}>
-      {icon}
-    </div>
-    <span className={`text-[8px] font-black uppercase tracking-[0.15em] transition-colors`}>{label}</span>
+const NavButton = ({ active, icon, label, onClick, theme }: any) => (
+  <button onClick={onClick} className={`flex flex-col items-center gap-1 w-12 transition-all ${active ? 'text-blue-600' : theme === 'dark' ? 'text-zinc-700' : 'text-zinc-400'}`}>
+    {icon}
+    <span className="text-[7px] font-black uppercase tracking-widest">{label}</span>
   </button>
 );
 
