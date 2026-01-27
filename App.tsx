@@ -216,15 +216,15 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <nav className={`h-[84px] border-t shrink-0 ${theme === 'dark' ? 'border-zinc-900 bg-black/95' : 'border-zinc-100 bg-white/95'} backdrop-blur-md grid grid-cols-5 items-center w-full z-[150] safe-area-bottom sticky bottom-0 left-0 right-0`}>
+      <nav className={`h-[84px] min-h-[84px] max-h-[84px] border-t shrink-0 ${theme === 'dark' ? 'border-zinc-900 bg-black/95' : 'border-zinc-100 bg-white/95'} backdrop-blur-md grid grid-cols-5 items-start pt-3 w-full z-[150] safe-area-bottom relative`}>
         <div className="flex justify-center items-center w-full">
           <NavButton active={activeTab === 'feed'} icon={<Home size={22} />} label="Início" onClick={() => { if (activeTab === 'feed') { fetchData(); } else { setActiveTab('feed'); } }} theme={theme} />
         </div>
         <div className="flex justify-center items-center w-full">
           <NavButton active={activeTab === 'discovery'} icon={<Search size={22} />} label="Busca" onClick={() => setActiveTab('discovery')} theme={theme} />
         </div>
-        <div className="flex justify-center items-center w-full h-full relative">
-          <div onClick={() => setActiveTab('record')} className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all cursor-pointer absolute -top-4"><PlusSquare size={24} /></div>
+        <div className="flex justify-center items-center w-full h-14 relative">
+          <div onClick={() => setActiveTab('record')} className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all cursor-pointer absolute -top-5"><PlusSquare size={24} /></div>
         </div>
         <div className="flex justify-center items-center w-full">
           <NavButton active={activeTab === 'following'} icon={<Users size={22} />} label="Seguindo" onClick={() => setActiveTab('following')} theme={theme} />
