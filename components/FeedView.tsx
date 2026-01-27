@@ -92,10 +92,10 @@ const FeedItem: React.FC<{
           loop
           muted={isGlobalMuted}
           playsInline
-          className={`h-full w-full transition-all duration-700 ease-in-out ${isExpanded || isLandscape ? 'object-contain' : 'object-cover'}`}
+          className={`h-full w-full transition-all duration-700 ease-in-out ${isExpanded || isLandscape ? 'object-contain' : 'object-contain'}`}
         />
       ) : (
-        <img src={post.url} className={`h-full w-full transition-all duration-700 ease-in-out ${isExpanded || isLandscape ? 'object-contain' : 'object-cover'}`} />
+        <img src={post.url} className={`h-full w-full transition-all duration-700 ease-in-out ${isExpanded || isLandscape ? 'object-contain' : 'object-contain'}`} />
       )}
 
       <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 pointer-events-none z-20" />

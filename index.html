@@ -24,32 +24,63 @@
 
     <style>
         :root {
-            --app-height: 100dvh;
+            --app-height: 100%;
+            --app-width: 100%;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            overscroll-behavior-y: none;
+            overscroll-behavior: none;
             -webkit-tap-highlight-color: transparent;
-            height: var(--app-height);
+            height: 100vh;
+            height: -webkit-fill-available;
             width: 100vw;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #0b0b0b;
+            background-color: #000;
             display: flex;
             justify-content: center;
+            align-items: center;
         }
 
-        /* Scroll suave e performance */
+        /* Container Principal "Perfect Fit" */
+        .mobile-frame {
+            width: var(--app-width);
+            height: var(--app-height);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #000;
+            transition: width 0.3s ease, height 0.3s ease;
+        }
+
+        /* Desktop Mode: Centralizado e Proporcional */
+        @media (min-width: 768px) {
+            .mobile-frame {
+                width: 430px;
+                /* Largura padrão Pro Max */
+                height: 90vh;
+                border-radius: 3rem;
+                border: 8px solid #1a1a1a;
+                box-shadow: 0 0 100px rgba(0, 0, 0, 0.5);
+            }
+        }
+
         .smooth-scroll {
             -webkit-overflow-scrolling: touch;
             scroll-behavior: smooth;
         }
 
-        ::-webkit-scrollbar {
-            width: 0px;
-            background: transparent;
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
         }
 
         .hide-scrollbar {
@@ -57,46 +88,45 @@
             scrollbar-width: none;
         }
 
-        /* Ajuste para telas com notch */
         .safe-area-bottom {
-            padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+            padding-bottom: env(safe-area-inset-bottom, 20px);
         }
 
-
-        /* Container Principal Responsivo */
-        .mobile-frame {
-            width: 100%;
-            max-width: 500px;
-            height: var(--app-height);
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            background: #000;
-            box-shadow: 0 0 100px rgba(0, 0, 0, 0.8);
+        .animate-gpu {
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
         }
 
-        @media (max-height: 600px) and (orientation: landscape) {
-            .mobile-frame {
-                max-width: 100%;
+        /* Fix para garantir que imagens e vídeos não "vazem" */
+        img,
+        video {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+
+    <script>
+        // Sistema de Detecção e Ajuste de Tela (Perfect Fit)
+        function updateAppDimensions() {
+            const isMobile = window.innerWidth < 768;
+            const doc = document.documentElement;
+
+            if (isMobile) {
+                doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+                doc.style.setProperty('--app-width', `${window.innerWidth}px`);
+            } else {
+                // No desktop usamos as dimensões fixas do frame
+                doc.style.setProperty('--app-height', '90vh');
+                doc.style.setProperty('--app-width', '430px');
             }
         }
 
-
-        /* Aceleração de Hardware */
-        .animate-gpu {
-            transform: translateZ(0);
-            backface-visibility: hidden;
-            perspective: 1000px;
-        }
-
-        /* Ajuste de inputs para evitar zoom automático no iOS */
-        input,
-        select,
-        textarea {
-            font-size: 16px !important;
-        }
-    </style>
+        window.addEventListener('resize', updateAppDimensions);
+        window.addEventListener('orientationchange', updateAppDimensions);
+        document.addEventListener('DOMContentLoaded', updateAppDimensions);
+        // IOS Fix
+        window.addEventListener('load', () => setTimeout(updateAppDimensions, 100));
+    </script>
     <script type="importmap">
 {
   "imports": {
