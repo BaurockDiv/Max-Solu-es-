@@ -46,7 +46,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack }) =>
   const daysPart = hoursParts.slice(0, hoursParts.length - 1).join(', ');
 
   return (
-    <div className="flex flex-col min-h-full bg-white dark:bg-black pb-28 relative transition-colors duration-500">
+    <div className="flex flex-col h-full overflow-y-auto no-scrollbar bg-white dark:bg-black pb-28 relative transition-colors duration-500">
       {selectedPost && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-300">
           <div className="absolute top-8 left-8 right-8 flex justify-between z-10">
@@ -65,7 +65,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack }) =>
         </div>
       )}
 
-      <div className="h-32 bg-gradient-to-br from-blue-600 to-indigo-900 relative">
+      <div className="h-32 bg-gradient-to-br from-blue-600 to-indigo-900 relative shrink-0">
         <div className="absolute top-5 left-5 right-5 flex justify-between z-10">
           <button onClick={onBack} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xl flex items-center justify-center text-white border border-white/10 active:scale-90 transition-transform"><ArrowLeft size={18} /></button>
           <button onClick={() => { navigator.share?.({ title: business.name, url: window.location.href }).catch(() => alert("Copiado!")); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xl flex items-center justify-center text-white border border-white/10"><Share2 size={16} /></button>
@@ -79,7 +79,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack }) =>
             <div className="absolute bottom-0 right-0 bg-green-500 w-5 h-5 rounded-full border-[3px] border-white dark:border-black shadow-lg" />
           </div>
           <div className="flex space-x-2 mb-2">
-            <button onClick={() => setFollowing(!following)} className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-md ${following ? 'bg-zinc-100 dark:bg-zinc-900 text-black dark:text-zinc-400' : 'bg-blue-600 text-white shadow-blue-500/10'}`}>{following ? 'Seguindo' : 'Seguir'}</button>
+            <button onClick={() => setFollowing(!following)} className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-md flex items-center justify-center ${following ? 'bg-zinc-100 dark:bg-zinc-900 text-black dark:text-zinc-400' : 'bg-blue-600 text-white shadow-blue-500/10'}`}>{following ? 'Seguindo' : 'Seguir'}</button>
           </div>
         </div>
 
@@ -94,8 +94,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack }) =>
         <p className="mt-3 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400 font-medium line-clamp-2">{business.bio}</p>
 
         <div className="flex border-b border-zinc-100 dark:border-zinc-900 mt-6 relative">
-          <button onClick={() => setActiveTab('posts')} className={`flex-1 py-3 text-[8px] font-black uppercase tracking-[0.2em] transition-all relative z-10 ${activeTab === 'posts' ? 'text-blue-600' : 'text-zinc-400'}`}>Posts ({posts.length}){activeTab === 'posts' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 rounded-full" />}</button>
-          <button onClick={() => setActiveTab('info')} className={`flex-1 py-3 text-[8px] font-black uppercase tracking-[0.2em] transition-all relative z-10 ${activeTab === 'info' ? 'text-blue-600' : 'text-zinc-400'}`}>Info & Contato{activeTab === 'info' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 rounded-full" />}</button>
+          <button onClick={() => setActiveTab('posts')} className={`flex-1 py-3 text-[8px] font-black uppercase tracking-[0.2em] transition-all relative z-10 flex items-center justify-center ${activeTab === 'posts' ? 'text-blue-600' : 'text-zinc-400'}`}>Posts ({posts.length}){activeTab === 'posts' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 rounded-full" />}</button>
+          <button onClick={() => setActiveTab('info')} className={`flex-1 py-3 text-[8px] font-black uppercase tracking-[0.2em] transition-all relative z-10 flex items-center justify-center ${activeTab === 'info' ? 'text-blue-600' : 'text-zinc-400'}`}>Info & Contato{activeTab === 'info' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 rounded-full" />}</button>
         </div>
 
         <div className="mt-5">
