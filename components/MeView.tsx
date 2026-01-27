@@ -321,12 +321,14 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
           {userPosts.length > 0 ? userPosts.map(post => (
             <div key={post.id} className="flex items-center gap-4 p-4 bg-zinc-100 dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-white/5">
               <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 bg-zinc-200 dark:bg-zinc-800 relative">
-                {post.type === 'video' && !post.thumbnail && !post.thumbnail_url ? (
-                  <div className="w-full h-full flex items-center justify-center text-zinc-400">
-                    <Camera size={20} />
-                  </div>
+                {post.type === 'video' ? (
+                  (post.thumbnail || post.thumbnail_url) ? (
+                    <img src={post.thumbnail || post.thumbnail_url} className="w-full h-full object-cover" />
+                  ) : (
+                    <video src={`${post.media_url}#t=0.5`} className="w-full h-full object-cover" preload="metadata" muted />
+                  )
                 ) : (
-                  <img src={post.thumbnail || post.thumbnail_url || post.media_url} className="w-full h-full object-cover" />
+                  <img src={post.media_url} className="w-full h-full object-cover" onError={(e) => (e.currentTarget.src = 'https://picsum.photos/200/200')} />
                 )}
                 {post.type === 'video' && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/10">
