@@ -66,6 +66,12 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateBusiness = (updated: Business) => {
+    setUserBusiness(updated);
+    // Sincroniza o feed global com as novas informações da empresa (logo, nome, etc)
+    fetchData();
+  };
+
   const handleNewPost = async (blob: Blob, type: 'video' | 'image', caption: string, onProgress: (p: number, s: string) => void) => {
     if (!session || !userBusiness) throw new Error("Crie um perfil profissional antes de postar.");
     
@@ -123,7 +129,7 @@ const App: React.FC = () => {
       }} />;
       case 'profile': return <ProfileView business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} />;
       case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
-      case 'me': return <MeView session={session} business={userBusiness} onUpdateBusiness={setUserBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} />;
+      case 'me': return <MeView session={session} business={userBusiness} onUpdateBusiness={handleUpdateBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} />;
       case 'record': return <RecordView onCancel={() => setActiveTab('feed')} onPost={handleNewPost} />;
       default: return null;
     }
