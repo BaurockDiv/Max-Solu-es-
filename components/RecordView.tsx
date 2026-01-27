@@ -85,21 +85,50 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
 
   const startCamera = async () => {
     stopCamera();
+
+    // Pequeno delay para garantir que o React renderizou o elemento video
+    await new Promise(resolve => setTimeout(resolve, 150));
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: facingMode } },
-        audio: true
-      });
+      // Tenta as configurações da mais alta para a mais básica
+      const constraintsList = [
+        { video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true },
+        { video: { facingMode: facingMode }, audio: true },
+        { video: true, audio: true }
+      ];
+
+      let stream = null;
+      for (const constraints of constraintsList) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (stream) break;
+        } catch (e) {
+          console.warn("Constraint failed, trying next...", e);
+        }
+      }
 
       if (stream && videoRef.current) {
         streamRef.current = stream;
+
+        // Limpeza prévia
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+
+        // Atribuição
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+
+        // Aguarda metadados para ter certeza que o stream está "pronto"
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(e => console.error("Play error:", e));
+        };
+
         setError(null);
+      } else if (!stream) {
+        throw new Error("Não foi possível acessar nenhuma câmera.");
       }
     } catch (e: any) {
-      console.error("Camera Error:", e);
-      setError("Permissão de câmera negada ou erro de hardware.");
+      console.error("Critical Camera Error:", e);
+      setError("Erro ao abrir câmera: " + (e.message || "Erro desconhecido"));
     }
   };
 
@@ -240,7 +269,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
       </div>
 
       {/* Área da Câmera (Flex Grow) */}
-      <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+      <div className="flex-1 relative bg-zinc-950 flex items-center justify-center overflow-hidden">
         {step === 'capture' ? (
           <>
             {error ? (
@@ -248,12 +277,18 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
                 <AlertTriangle size={48} className="text-red-500 mb-2" />
                 <p className="text-white font-bold text-lg">Câmera Indisponível</p>
                 <p className="text-zinc-500 text-sm max-w-xs">{error}</p>
-                <button onClick={() => fileInputRef.current?.click()} className="mt-4 bg-zinc-800 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest">
-                  Escolher Arquivo
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={startCamera} className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest active:scale-95 shadow-lg">
+                    Tentar Novamente
+                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} className="mt-4 bg-zinc-800 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest active:scale-95">
+                    Arquivo
+                  </button>
+                </div>
               </div>
             ) : (
               <video
+                key={facingMode}
                 ref={videoRef}
                 autoPlay
                 muted
@@ -261,7 +296,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
                 className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent pointer-events-none" />
           </>
         ) : (
           <div className="w-full h-full bg-black relative">
