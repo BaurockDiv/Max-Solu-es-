@@ -25,9 +25,10 @@ import { Conversation, Message, Business } from '../types';
 interface ChatViewProps {
     session: any;
     onBack: () => void;
+    initialBizId?: string | null;
 }
 
-const ChatView: React.FC<ChatViewProps> = ({ session, onBack }) => {
+const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) => {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [activeConv, setActiveConv] = useState<Conversation | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -93,6 +94,18 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack }) => {
             });
 
             setConversations(formatted);
+
+            // Auto-select conversation if initialBizId is provided
+            if (initialBizId) {
+                const found = formatted.find(c =>
+                    c.participant_1 === initialBizId ||
+                    c.participant_2 === initialBizId ||
+                    (c.other_participant as any)?.owner_id === initialBizId
+                );
+                if (found) {
+                    setActiveConv(found);
+                }
+            }
         } catch (err) {
             console.error("Error loading chats:", err);
         } finally {
@@ -238,8 +251,8 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack }) => {
                                 return (
                                     <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
                                         <div className={`max-w-[80%] rounded-[2rem] px-5 py-4 ${isMe
-                                                ? 'bg-blue-600 text-white rounded-br-none shadow-xl shadow-blue-500/20'
-                                                : 'bg-white dark:bg-zinc-900 text-zinc-950 dark:text-zinc-100 rounded-bl-none border border-zinc-200 dark:border-zinc-800 shadow-sm'
+                                            ? 'bg-blue-600 text-white rounded-br-none shadow-xl shadow-blue-500/20'
+                                            : 'bg-white dark:bg-zinc-900 text-zinc-950 dark:text-zinc-100 rounded-bl-none border border-zinc-200 dark:border-zinc-800 shadow-sm'
                                             }`}>
                                             <p className="text-sm font-medium leading-relaxed">{m.content}</p>
                                             <div className={`flex items-center gap-1 mt-1.5 ${isMe ? 'justify-end text-blue-100' : 'justify-start text-zinc-400'}`}>

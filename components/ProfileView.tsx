@@ -24,7 +24,7 @@ interface ProfileViewProps {
   posts: MediaPost[];
   onBack: () => void;
   session?: any;
-  onStartChat: () => void;
+  onStartChat: (ownerId: string) => void;
 }
 
 const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, session, onStartChat }) => {
@@ -66,10 +66,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, sess
         });
       }
 
-      onStartChat();
+      onStartChat(business.owner_id);
     } catch (err) {
       console.error("Chat error:", err);
-      onStartChat(); // Tenta abrir mesmo assim
+      onStartChat(business.owner_id); // Tenta abrir mesmo assim
     }
   };
 

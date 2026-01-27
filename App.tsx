@@ -23,6 +23,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [errorModal, setErrorModal] = useState<{ title: string, msg: string, isSql?: boolean } | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('maxcompany-theme') as 'light' | 'dark') || 'dark');
+  const [activeChatBizId, setActiveChatBizId] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem('maxcompany-theme', theme);
@@ -167,10 +168,10 @@ const App: React.FC = () => {
     }
     switch (activeTab) {
       case 'following': return <FollowingView onProfileClick={(id) => openProfile(id, 'following')} userId={session?.user.id} />;
-      case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} onStartChat={() => setActiveTab('chat')} />;
+      case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} onStartChat={(bizId) => { setActiveChatBizId(bizId); setActiveTab('chat'); }} />;
       case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
-      case 'me': return <MeView session={session} business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} onUpdateBusiness={handleUpdateBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} onPreviewProfile={(id) => openProfile(id, 'me')} onOpenChat={() => setActiveTab('chat')} />;
-      case 'chat': return <ChatView session={session} onBack={() => setActiveTab('me')} />;
+      case 'me': return <MeView session={session} business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} onUpdateBusiness={handleUpdateBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} onPreviewProfile={(id) => openProfile(id, 'me')} onOpenChat={() => { setActiveChatBizId(null); setActiveTab('chat'); }} />;
+      case 'chat': return <ChatView session={session} onBack={() => setActiveTab('me')} initialBizId={activeChatBizId} />;
       case 'record': return <RecordView onCancel={() => { setActiveTab(lastTab); setLastTab('feed'); }} onPost={handleNewPost} />;
       default: return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} onRefresh={fetchData} userId={session?.user.id} />;
     }
