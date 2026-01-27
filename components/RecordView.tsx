@@ -23,9 +23,9 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [quality, setQuality] = useState<'ultra' | 'high' | 'balanced'>('balanced'); // Default to Balanced (720p)
 
   const qualityConfig = {
-    ultra: { width: 3840, height: 2160, bitrate: 8000000 },
-    high: { width: 1920, height: 1080, bitrate: 4000000 },
-    balanced: { width: 1280, height: 720, bitrate: 2000000 }
+    ultra: { width: 3840, height: 2160, bitrate: 50000000 }, // 50Mbps
+    high: { width: 1920, height: 1080, bitrate: 25000000 },  // 25Mbps
+    balanced: { width: 1280, height: 720, bitrate: 10000000 } // 10Mbps
   };
 
   const videoRef = useRef<HTMLVideoElement>(null);

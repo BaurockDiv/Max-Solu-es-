@@ -25,13 +25,16 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  ChevronDown
+  ChevronDown,
+  Trash2,
+  ArrowLeft
 } from 'lucide-react';
-import { Business, Category } from '../types';
+import { Business, Category, MediaPost } from '../types';
 
 interface MeViewProps {
   session: any;
   business: Business | null;
+  userPosts: MediaPost[];
   onUpdateBusiness: (updated: Business) => void;
   theme: 'light' | 'dark';
   onToggleTheme: (theme: 'light' | 'dark') => void;
@@ -49,8 +52,9 @@ const DAYS_OF_WEEK = [
   { id: 'Sab', label: 'S' },
 ];
 
-const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onUpdateBusiness, theme, onToggleTheme, onOpenDashboard, onPreviewProfile }) => {
-  const [activeView, setActiveView] = useState<'main' | 'edit-profile'>('main');
+const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, userPosts, onUpdateBusiness, theme, onToggleTheme, onOpenDashboard, onPreviewProfile }) => {
+  const [activeView, setActiveView] = useState<'main' | 'edit-profile' | 'manage-posts'>('main');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -214,6 +218,59 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
     } finally { setIsSaving(false); }
   };
 
+  const handleDeletePost = async (id: string) => {
+    if (!window.confirm("Deseja remover esta publicação?")) return;
+    setDeletingId(id);
+    try {
+      const { error } = await supabase.from('posts').delete().eq('id', id);
+      if (error) throw error;
+      // Recarregar dados após deletar
+      onUpdateBusiness(initialBusiness!);
+    } catch (err: any) {
+      alert("Erro ao deletar: " + err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (activeView === 'manage-posts') {
+    return (
+      <div className="flex-1 flex flex-col bg-white dark:bg-black overflow-hidden animate-in slide-in-from-right duration-300">
+        <div className="p-6 pt-12 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
+          <button onClick={() => setActiveView('main')} className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-zinc-950 dark:text-white"><ArrowLeft size={18} /></button>
+          <h2 className="text-[11px] font-black uppercase tracking-widest text-zinc-950 dark:text-white">Minhas Publicações</h2>
+          <div className="w-10" />
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 pb-28">
+          {userPosts.length > 0 ? userPosts.map(post => (
+            <div key={post.id} className="flex items-center gap-4 p-4 bg-zinc-100 dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-white/5">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0">
+                <img src={post.thumbnail || post.media_url} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold text-zinc-950 dark:text-white truncate">{post.caption || 'Sem legenda'}</p>
+                <p className="text-[8px] font-black uppercase text-zinc-500 tracking-tighter mt-1">{post.type === 'video' ? 'Vídeo' : 'Foto'} • {post.likes} Likes</p>
+              </div>
+              <button
+                onClick={() => handleDeletePost(post.id)}
+                disabled={deletingId === post.id}
+                className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/20 text-red-600 flex items-center justify-center active:scale-95 transition-all"
+              >
+                {deletingId === post.id ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+              </button>
+            </div>
+          )) : (
+            <div className="text-center py-20 space-y-4 opacity-40">
+              <PlusCircle size={40} className="mx-auto" />
+              <p className="text-[10px] font-black uppercase tracking-widest">Nenhuma publicação ativa</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col relative bg-white dark:bg-black overflow-hidden animate-gpu">
       {/* VIEW PRINCIPAL */}
@@ -242,9 +299,14 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
             </div>
           ) : (
             <div className="space-y-4">
-              <button onClick={onOpenDashboard} className="w-full flex items-center justify-between p-6 bg-blue-600 text-white rounded-[2.4rem] shadow-xl shadow-blue-600/10 active:scale-[0.98] transition-all">
+              <button onClick={onOpenDashboard} className="w-full flex items-center justify-between p-6 bg-blue-600 text-white rounded-[2.4rem] shadow-xl shadow-blue-500/10 active:scale-[0.98] transition-all">
                 <div className="flex items-center gap-4"><LayoutDashboard size={22} /><span className="text-[11px] font-black uppercase tracking-widest">Painel de Métricas</span></div>
                 <TrendingUp size={18} />
+              </button>
+
+              <button onClick={() => setActiveView('manage-posts')} className="w-full flex items-center justify-between p-6 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2.4rem] active:scale-[0.98] transition-all group">
+                <div className="flex items-center gap-4"><PlusCircle size={22} className="text-zinc-400 group-hover:text-blue-500 transition-colors" /><span className="text-[11px] font-black uppercase tracking-widest text-zinc-950 dark:text-white">Gestão de Conteúdo</span></div>
+                <ChevronRight size={18} className="text-zinc-400" />
               </button>
 
               <div className="bg-zinc-100 dark:bg-zinc-900 rounded-[2.4rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">

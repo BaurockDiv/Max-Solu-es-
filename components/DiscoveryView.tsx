@@ -19,6 +19,8 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
   const [onlyVerified, setOnlyVerified] = useState(false);
   const [locationFilter, setLocationFilter] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'verified'>('verified');
+  // Novo estado para raio de busca
+  const [radius, setRadius] = useState(10);
 
   const categories = Object.values(Category);
 
@@ -70,6 +72,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
     setOnlyVerified(false);
     setLocationFilter('');
     setSortBy('verified');
+    setRadius(10);
   };
 
   return (
@@ -77,7 +80,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
       {/* Header Fixo com Busca */}
       <div className="p-6 pb-4 space-y-4 shrink-0 bg-white dark:bg-black z-10">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-white italic">Descobrir</h1>
+          <h1 className="text-3xl font-black tracking-tight text-zinc-950 dark:text-white italic">Descobrir</h1>
           <button
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${showAdvancedFilters ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500'}`}
@@ -104,7 +107,7 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
 
         {/* Painel de Filtros Avançados Expansível */}
         {showAdvancedFilters && (
-          <div className="p-5 bg-zinc-100 dark:bg-zinc-950 rounded-[2rem] border border-zinc-300 dark:border-zinc-900 animate-in slide-in-from-top-2 duration-300 space-y-5 shadow-sm">
+          <div className="p-5 bg-zinc-100 dark:bg-zinc-950 rounded-[2rem] border border-zinc-300 dark:border-zinc-900 animate-in slide-in-from-top-2 duration-300 space-y-5 shadow-lg">
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setOnlyVerified(!onlyVerified)}
@@ -121,14 +124,25 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
               </button>
             </div>
 
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={14} />
+            <div className="space-y-3">
+              <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">Localização e Raio ({radius}km)</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={14} />
+                <input
+                  type="text"
+                  placeholder="Cidade ou Bairro..."
+                  className="w-full bg-white dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl py-3 pl-9 pr-4 text-[11px] font-bold text-zinc-950 dark:text-white outline-none focus:ring-1 focus:ring-blue-600"
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                />
+              </div>
               <input
-                type="text"
-                placeholder="Filtrar por cidade ou estado..."
-                className="w-full bg-white dark:bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl py-3 pl-9 pr-4 text-[11px] font-bold text-zinc-950 dark:text-white outline-none focus:ring-1 focus:ring-blue-600"
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
+                type="range"
+                min="1"
+                max="100"
+                value={radius}
+                onChange={(e) => setRadius(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-zinc-300 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
               />
             </div>
 
@@ -140,22 +154,28 @@ const DiscoveryView: React.FC<DiscoveryViewProps> = ({ onBusinessClick }) => {
       {/* Area de Conteúdo Scrollable */}
       <div className="flex-1 overflow-y-auto hide-scrollbar smooth-scroll animate-gpu touch-pan-y">
         <div className="p-6 pt-0 space-y-8 pb-32">
-          {/* Categorias - Horizontal Scroll preservado mas com container fixo */}
+          {/* Categorias - Vertical List (1 em 1) */}
           <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
-              <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Explorar Segmentos</h2>
+              <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Segmentos Especializados</h2>
             </div>
-            <div className="flex overflow-x-auto gap-3 hide-scrollbar pb-2 -mx-1 px-1">
+            <div className="grid grid-cols-1 gap-3">
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat === selectedCategory ? null : cat)}
-                  className={`h-24 min-w-[120px] rounded-[1.8rem] p-4 flex flex-col justify-end relative overflow-hidden active:scale-95 transition-all cursor-pointer border-2 ${selectedCategory === cat ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-zinc-200 dark:border-transparent bg-zinc-100 dark:bg-zinc-900 shadow-sm'}`}
+                  className={`flex items-center gap-4 p-5 rounded-3xl border-2 transition-all active:scale-[0.98] ${selectedCategory === cat ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 shadow-lg' : 'border-zinc-200 dark:border-zinc-900 bg-zinc-100 dark:bg-zinc-900 shadow-sm'}`}
                 >
-                  <Grid size={18} className={selectedCategory === cat ? 'text-blue-500' : 'text-zinc-500 dark:text-zinc-600'} />
-                  <span className={`text-[9px] font-black leading-tight mt-2 uppercase tracking-tighter text-left ${selectedCategory === cat ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-800 dark:text-zinc-400'}`}>
-                    {cat}
-                  </span>
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${selectedCategory === cat ? 'bg-blue-600 text-white' : 'bg-white dark:bg-black text-zinc-400'}`}>
+                    <Grid size={24} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <span className={`text-[11px] font-black uppercase tracking-tight ${selectedCategory === cat ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-950 dark:text-white'}`}>
+                      {cat}
+                    </span>
+                    <p className="text-[8px] font-bold text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">Explorar Profissionais</p>
+                  </div>
+                  {selectedCategory === cat && <CheckCircle2 size={18} className="text-blue-600" />}
                 </button>
               ))}
             </div>

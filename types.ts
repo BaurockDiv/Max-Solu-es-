@@ -1,12 +1,23 @@
 
 export enum Category {
-  FOOD = 'Food & Hospitality',
-  TECH = 'Tech & Design',
-  SERVICES = 'Professional Services',
-  CRAFTS = 'Art & Crafts',
-  HEALTH = 'Health & Wellness',
-  REAL_ESTATE = 'Real Estate',
-  EDUCATION = 'Education'
+  BEAUTY = 'Beleza & Estética',
+  HEALTH = 'Saúde & Bem-estar',
+  TECH = 'Tecnologia & TI',
+  MARKETING = 'Marketing & Vendas',
+  LAW = 'Direito & Jurídico',
+  FINANCE = 'Finanças & Contabilidade',
+  CONSTRUCTION = 'Construção & Reformas',
+  EDUCATION = 'Educação & Treinamentos',
+  FOOD = 'Gastronomia & Eventos',
+  AUTOMOTIVE = 'Automotivo & Mecânica',
+  RETAIL = 'Varejo & Comércio',
+  SERVICES = 'Serviços Domésticos',
+  PETS = 'Pets & Veterinária',
+  ARTS = 'Artes & Entretenimento',
+  REAL_ESTATE = 'Imobiliária & Corretagem',
+  FASHION = 'Moda & Acessórios',
+  LOGISTICS = 'Transporte & Logística',
+  FITNESS = 'Esportes & Fitness'
 }
 
 export interface Business {
