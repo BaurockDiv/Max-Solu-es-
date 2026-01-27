@@ -272,8 +272,15 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           <div className="flex flex-col items-center">
-            <div className="w-full aspect-[4/5] max-w-[280px] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-zinc-100 dark:border-zinc-900">
-              <img src={editFile || 'https://picsum.photos/400/500'} className="w-full h-full object-cover" />
+            <div className="w-full aspect-[4/5] max-w-[280px] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-zinc-100 dark:border-zinc-900 bg-zinc-100 dark:bg-zinc-900 relative">
+              <img src={editFile || editingPost.thumbnail || editingPost.thumbnail_url || editingPost.media_url} className="w-full h-full object-cover" />
+              {editingPost.type === 'video' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                  <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+                    <div className="w-0 h-0 border-t-[8px] border-t-transparent border-l-[14px] border-l-white border-b-[8px] border-b-transparent ml-1" />
+                  </div>
+                </div>
+              )}
             </div>
             <p className="mt-4 text-[9px] font-black uppercase text-zinc-400 tracking-widest">{editingPost.type === 'video' ? 'Miniatura do Vídeo' : 'Foto Postada'}</p>
           </div>
@@ -313,8 +320,21 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
         <div className="flex-1 overflow-y-auto p-6 space-y-4 pb-28">
           {userPosts.length > 0 ? userPosts.map(post => (
             <div key={post.id} className="flex items-center gap-4 p-4 bg-zinc-100 dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-white/5">
-              <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0">
-                <img src={post.thumbnail || post.media_url} className="w-full h-full object-cover" />
+              <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 bg-zinc-200 dark:bg-zinc-800 relative">
+                {post.type === 'video' && !post.thumbnail && !post.thumbnail_url ? (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                    <Camera size={20} />
+                  </div>
+                ) : (
+                  <img src={post.thumbnail || post.thumbnail_url || post.media_url} className="w-full h-full object-cover" />
+                )}
+                {post.type === 'video' && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                    <div className="w-6 h-6 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                      <div className="w-0 h-0 border-t-[4px] border-t-transparent border-l-[7px] border-l-white border-b-[4px] border-b-transparent ml-0.5" />
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] font-bold text-zinc-950 dark:text-white truncate">{post.caption || 'Sem legenda'}</p>
