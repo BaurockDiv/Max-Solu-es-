@@ -84,45 +84,75 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   };
 
   const startCamera = async () => {
+    console.log("Starting camera...");
     stopCamera();
-    const config = qualityConfig[quality];
-    try {
-      const constraints = {
-        video: {
-          aspectRatio: { ideal: 9 / 16 },
-          width: { ideal: config.width },
-          height: { ideal: config.height },
-          facingMode: { ideal: facingMode },
-          frameRate: { ideal: 60, min: 30 } // Tenta forçar 60fps, aceita 30
-        },
-        // AUDIO PRO: Desativa filtros que destroem a qualidade em gravações
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: 2,
-          sampleRate: 48000
-        }
-      };
 
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (err) {
-        console.warn("Retrying camera with simple fallback...");
-        stream = await navigator.mediaDevices.getUserMedia({
+    // Pequeno delay para garantir que o elemento video existe no DOM (especialmente após mudar de aba)
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    try {
+      const config = qualityConfig[quality];
+      let stream: MediaStream | null = null;
+
+      // Lista de tentativas do mais avançado ao mais básico
+      const attempts = [
+        // 1. Ideal (com qualidade solicitada)
+        {
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: config.width },
+            height: { ideal: config.height },
+            frameRate: { ideal: 30 }
+          },
+          audio: { echoCancellation: true, noiseSuppression: true }
+        },
+        // 2. Compatível (apenas orientação)
+        {
           video: { facingMode: { ideal: facingMode } },
           audio: true
-        });
+        },
+        // 3. Super Básico (qualquer câmera)
+        {
+          video: true,
+          audio: true
+        }
+      ];
+
+      for (const constraints of attempts) {
+        try {
+          console.log("Attempting constraints:", constraints);
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (stream) break;
+        } catch (err) {
+          console.warn("Attempt failed, trying next level...", err);
+        }
       }
 
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setError(null);
-      setFlashLevel(0);
+      if (stream) {
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+
+          // Alguns navegadores mobile exigem carregamento de metadados
+          videoRef.current.onloadedmetadata = async () => {
+            try {
+              if (videoRef.current) {
+                await videoRef.current.play();
+                console.log("Camera playing successfully");
+              }
+            } catch (playErr) {
+              console.error("Manual play error:", playErr);
+            }
+          };
+        }
+        setError(null);
+        setFlashLevel(0);
+      } else {
+        throw new Error("Não foi possível obter nenhum stream de média.");
+      }
     } catch (e: any) {
-      console.error("Camera Error:", e);
-      setError("Permissão de câmera negada ou dispositivo indisponível.");
+      console.error("Global Camera Error:", e);
+      setError("Permissão de câmera negada ou erro de hardware. Tente recarregar a página.");
     }
   };
 
