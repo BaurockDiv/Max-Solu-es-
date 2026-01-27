@@ -87,23 +87,21 @@ const FollowingView: React.FC<FollowingViewProps> = ({ onProfileClick }) => {
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-black transition-colors duration-500 overflow-hidden">
-      {/* Novidades Bar - Redesenhada para economizar espaço */}
-      <div className="bg-zinc-100 dark:bg-zinc-900/40 backdrop-blur-3xl pt-6 pb-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0 z-10">
-        <div className="px-6 flex items-center justify-between mb-2">
-          <h1 className="text-xl font-black text-zinc-950 dark:text-white uppercase tracking-tighter italic">Rede</h1>
-          <button onClick={loadFollowingContent} className="w-9 h-9 rounded-full bg-white dark:bg-zinc-900 flex items-center justify-center text-zinc-950 dark:text-zinc-400 shadow-sm border border-zinc-200 dark:border-zinc-800">
-            <Bell size={16} />
-          </button>
-        </div>
-        <div className="flex overflow-x-auto gap-4 px-6 hide-scrollbar">
+      {/* Novidades Bar - Redesenhada para ser ultra-compacta */}
+      <div className="bg-zinc-100 dark:bg-zinc-900/40 backdrop-blur-3xl pt-2 pb-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0 z-10 relative">
+        <div className="flex overflow-x-auto gap-4 px-6 hide-scrollbar relative">
           {followedBusinesses.map(biz => (
-            <div key={biz.id} className="flex flex-col items-center space-y-1.5 flex-shrink-0 cursor-pointer active:scale-95 transition-all group" onClick={() => onProfileClick(biz.id)}>
-              <div className="w-12 h-12 rounded-[1.4rem] p-0.5 border-2 border-blue-600 bg-white dark:bg-black shadow-lg shadow-blue-500/5 group-active:scale-90 transition-transform">
-                <img src={biz.logo || 'https://picsum.photos/200/200'} className="w-full h-full object-cover rounded-[1.2rem]" alt={biz.name} />
+            <div key={biz.id} className="flex flex-col items-center space-y-1 flex-shrink-0 cursor-pointer active:scale-95 transition-all group" onClick={() => onProfileClick(biz.id)}>
+              <div className="w-11 h-11 rounded-[1.2rem] p-0.5 border-2 border-blue-600 bg-white dark:bg-black shadow-lg shadow-blue-500/5 group-active:scale-90 transition-transform">
+                <img src={biz.logo || 'https://picsum.photos/200/200'} className="w-full h-full object-cover rounded-[1rem]" alt={biz.name} />
               </div>
-              <span className="text-[7.5px] font-bold text-zinc-950 dark:text-zinc-400 uppercase tracking-tighter max-w-[48px] truncate">{biz.name.split(' ')[0]}</span>
+              <span className="text-[7px] font-bold text-zinc-950 dark:text-zinc-400 uppercase tracking-tighter max-w-[44px] truncate">{biz.name.split(' ')[0]}</span>
             </div>
           ))}
+
+          <button onClick={loadFollowingContent} className="flex-shrink-0 w-11 h-11 rounded-[1.2rem] bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 active:scale-90 transition-all border border-zinc-300 dark:border-zinc-700">
+            <Bell size={16} />
+          </button>
         </div>
       </div>
 
