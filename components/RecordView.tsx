@@ -20,6 +20,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [error, setError] = useState<string | null>(null);
   const [flashLevel, setFlashLevel] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [quality, setQuality] = useState<'ultra' | 'high' | 'balanced'>('balanced'); // Default to Balanced (720p)
 
   const qualityConfig = {
@@ -84,16 +85,16 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   };
 
   const startCamera = async () => {
+    setIsInitializing(true);
     stopCamera();
 
     // Pequeno delay para garantir que o React renderizou o elemento video
-    await new Promise(resolve => setTimeout(resolve, 150));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     try {
-      // Tenta as configurações da mais alta para a mais básica
       const constraintsList = [
-        { video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true },
-        { video: { facingMode: facingMode }, audio: true },
+        { video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true },
+        { video: { facingMode: { ideal: facingMode } }, audio: true },
         { video: true, audio: true }
       ];
 
@@ -103,39 +104,42 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
           stream = await navigator.mediaDevices.getUserMedia(constraints);
           if (stream) break;
         } catch (e) {
-          console.warn("Constraint failed, trying next...", e);
+          console.warn("Constraint failed:", e);
         }
       }
 
       if (stream && videoRef.current) {
         streamRef.current = stream;
-
-        // Limpeza prévia
-        videoRef.current.pause();
-        videoRef.current.srcObject = null;
-
-        // Atribuição
         videoRef.current.srcObject = stream;
 
-        // Aguarda metadados para ter certeza que o stream está "pronto"
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(e => console.error("Play error:", e));
-        };
+        await new Promise((resolve) => {
+          if (!videoRef.current) return resolve(null);
+          videoRef.current.onloadedmetadata = () => resolve(null);
+        });
 
+        await videoRef.current.play();
         setError(null);
       } else if (!stream) {
         throw new Error("Não foi possível acessar nenhuma câmera.");
       }
     } catch (e: any) {
-      console.error("Critical Camera Error:", e);
+      console.error("Critical:", e);
       setError("Erro ao abrir câmera: " + (e.message || "Erro desconhecido"));
+    } finally {
+      setIsInitializing(false);
     }
   };
 
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   };
 
@@ -143,7 +147,6 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     if (!streamRef.current) return;
     chunksRef.current = [];
 
-    // Tenta forçar MP4 (H.264) primeiro pois geralmente é acelerado por hardware (mais fluido)
     let mimeType = 'video/webm';
     if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
     else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) mimeType = 'video/webm;codecs=h264';
@@ -152,7 +155,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     const options = {
       mimeType,
       videoBitsPerSecond: qualityConfig[quality].bitrate,
-      audioBitsPerSecond: 192000 // Aumenta para 192kbps (qualidade quase CD)
+      audioBitsPerSecond: 192000
     };
 
     try {
@@ -165,26 +168,24 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         setPreviewUrl(URL.createObjectURL(blob));
         setStep('edit');
       };
-      // REMOVIDO TIMESLICE (1000) -> Isso remove a "travadinha" a cada segundo
       recorder.start();
       setIsRecording(true);
       setDuration(0);
       timerRef.current = window.setInterval(() => setDuration(d => d + 1), 1000);
     } catch (err) {
       console.error(err);
-      setError("Erro ao iniciar gravação. Tente reduzir a qualidade.");
+      setError("Erro ao iniciar gravação.");
     }
   };
 
   const stopRecording = () => {
-    generateThumbnail(); // Captura frame final como thumb
+    generateThumbnail();
     if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
     if (timerRef.current) clearInterval(timerRef.current);
     setIsRecording(false);
   };
 
   const takePhoto = () => {
-    // ... mantendo lógica existente ...
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -204,7 +205,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-zinc-950 z-[300] flex flex-col font-sans" style={{ touchAction: 'none' }}>
+    <div className="flex-1 flex flex-col bg-zinc-950 relative overflow-hidden h-full w-full" style={{ touchAction: 'none' }}>
       <canvas ref={canvasRef} className="hidden" />
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" onChange={(e) => {
         const file = e.target.files?.[0];
@@ -217,9 +218,16 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         }
       }} />
 
+      {isInitializing && !error && (
+        <div className="absolute inset-0 z-[100] bg-black flex flex-col items-center justify-center space-y-4">
+          <Loader2 className="animate-spin text-blue-600" size={40} />
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Iniciando Hardware...</p>
+        </div>
+      )}
+
       {/* Settings Modal */}
       {showSettings && (
-        <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
+        <div className="absolute inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-zinc-900 w-full max-w-xs rounded-3xl p-6 border border-white/10 shadow-2xl space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-white font-black uppercase tracking-wider">Qualidade</h3>
@@ -236,47 +244,38 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         </div>
       )}
 
-      {/* Header - SEMPRE VISÍVEL */}
       <div className="absolute top-0 left-0 right-0 p-6 flex items-center justify-between z-[60] pointer-events-none" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}>
-        <button onClick={onCancel} className="w-12 h-12 rounded-2xl bg-zinc-900/90 backdrop-blur-xl flex items-center justify-center text-white border border-white/10 pointer-events-auto active:scale-90 transition-all shadow-2xl">
+        <button onClick={onCancel} className="w-12 h-12 rounded-2xl bg-zinc-900/90 backdrop-blur-xl flex items-center justify-center text-white border border-white/10 pointer-events-auto active:scale-90 shadow-2xl">
           <X size={24} />
         </button>
-
         {isRecording && (
           <div className="bg-red-600 px-5 py-2 rounded-full text-white text-[12px] font-black tracking-widest flex items-center gap-2 animate-pulse shadow-xl border border-white/20">
             <div className="w-2.5 h-2.5 bg-white rounded-full" />
             00:{duration.toString().padStart(2, '0')}
           </div>
         )}
-
         <div className="flex gap-3 pointer-events-auto">
           {facingMode === 'environment' && (
             <button onClick={toggleFlash} className={`w-12 h-12 rounded-2xl backdrop-blur-xl flex items-center justify-center border border-white/10 transition-all ${flashLevel > 0 ? 'bg-yellow-400 text-black shadow-[0_0_20px_rgba(250,204,21,0.4)]' : 'bg-zinc-900/90 text-white'}`}>
               <Zap size={22} className={flashLevel > 0 ? 'fill-current' : ''} />
             </button>
           )}
-          <button onClick={() => setShowSettings(true)} className="w-12 h-12 rounded-2xl bg-zinc-900/90 backdrop-blur-xl flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all shadow-2xl">
+          <button onClick={() => setShowSettings(true)} className="w-12 h-12 rounded-2xl bg-zinc-900/90 backdrop-blur-xl flex items-center justify-center text-white border border-white/10 active:scale-90 shadow-2xl">
             <Settings size={22} />
           </button>
         </div>
       </div>
 
-      {/* Área da Câmera / Preview */}
       <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
         {step === 'capture' ? (
           <>
             {error ? (
               <div className="flex flex-col items-center justify-center text-center p-10 space-y-6 z-10 w-full max-w-sm">
-                <div className="w-20 h-20 rounded-[2rem] bg-red-600/20 flex items-center justify-center text-red-500 border border-red-500/20 shadow-2xl">
-                  <AlertTriangle size={40} />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-white font-black text-xl uppercase tracking-tighter italic">Câmera Bloqueada</p>
-                  <p className="text-zinc-500 text-xs font-medium leading-relaxed">{error}</p>
-                </div>
+                <AlertTriangle size={40} className="text-red-500" />
+                <p className="text-zinc-500 text-xs font-medium leading-relaxed">{error}</p>
                 <div className="flex flex-col gap-3 w-full">
-                  <button onClick={() => { setError(null); startCamera(); }} className="w-full py-5 bg-blue-600 text-white rounded-[1.8rem] font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all shadow-xl shadow-blue-600/20">Tentar Novamente</button>
-                  <button onClick={() => fileInputRef.current?.click()} className="w-full py-5 bg-zinc-900 text-zinc-400 rounded-[1.8rem] border border-white/5 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all">Usar Galeria</button>
+                  <button onClick={() => { setError(null); startCamera(); }} className="w-full py-5 bg-blue-600 text-white rounded-[1.8rem] font-black text-[11px] uppercase active:scale-95">Tentar Novamente</button>
+                  <button onClick={() => fileInputRef.current?.click()} className="w-full py-5 bg-zinc-900 text-zinc-400 rounded-[1.8rem] border border-white/5 font-black text-[11px] uppercase active:scale-95">Usar Galeria</button>
                 </div>
               </div>
             ) : (
@@ -286,51 +285,43 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
                 autoPlay
                 muted
                 playsInline
-                className={`w-full h-full object-cover transition-opacity duration-700 ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+                className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent pointer-events-none" />
           </>
         ) : (
           <div className="w-full h-full bg-zinc-900 relative flex items-center justify-center">
-            <div className="absolute inset-0 opacity-40 blur-3xl scale-125 overflow-hidden">
-              {captureMode === 'video' ? <video src={previewUrl!} className="w-full h-full object-cover" /> : <img src={previewUrl!} className="w-full h-full object-cover" />}
-            </div>
-            <div className="relative z-10 w-full h-full flex items-center justify-center p-8 pb-40">
-              {captureMode === 'video' ? (
-                <video src={previewUrl!} autoPlay loop playsInline className="max-w-full max-h-full rounded-[2.5rem] shadow-[0_0_80px_rgba(0,0,0,0.8)] border-4 border-white/10" />
-              ) : (
-                <img src={previewUrl!} className="max-w-full max-h-full rounded-[2.5rem] shadow-[0_0_80px_rgba(0,0,0,0.8)] border-4 border-white/10" />
-              )}
-            </div>
-            <button onClick={() => { setStep('capture'); setPreviewUrl(null); }} className="absolute top-8 left-8 z-[70] w-12 h-12 bg-black/60 backdrop-blur-xl rounded-2xl text-white flex items-center justify-center border border-white/10 active:scale-90"><X /></button>
+            {captureMode === 'video' ? (
+              <video src={previewUrl!} autoPlay loop playsInline className="max-w-full max-h-full rounded-[2.5rem] shadow-2xl" />
+            ) : (
+              <img src={previewUrl!} className="max-w-full max-h-full rounded-[2.5rem] shadow-2xl" />
+            )}
+            <button onClick={() => { setStep('capture'); setPreviewUrl(null); }} className="absolute top-8 left-8 z-[70] w-12 h-12 bg-black/60 backdrop-blur-xl rounded-2xl text-white flex items-center justify-center border border-white/10"><X /></button>
           </div>
         )}
       </div>
 
-      {/* Footer - SEMPRE VISÍVEL */}
       <div className="bg-zinc-900/95 backdrop-blur-3xl pt-10 px-8 flex flex-col items-center gap-8 shrink-0 z-50 w-full relative" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2.5rem)' }}>
         {step === 'capture' ? (
           <>
-            <div className="flex bg-black/40 p-1 rounded-full border border-white/5 backdrop-blur-md">
+            <div className="flex bg-black/40 p-1 rounded-full border border-white/5">
               <button onClick={() => setCaptureMode('video')} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${captureMode === 'video' ? 'bg-white text-black shadow-lg scale-105' : 'text-zinc-500'}`}>Vídeo</button>
               <button onClick={() => setCaptureMode('image')} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${captureMode === 'image' ? 'bg-white text-black shadow-lg scale-105' : 'text-zinc-500'}`}>Foto</button>
             </div>
 
             <div className="flex items-center justify-between w-full max-w-sm">
-              <button onClick={() => fileInputRef.current?.click()} className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-zinc-400 border border-white/10 hover:bg-white/10 active:scale-90 transition-all"><ImageIcon size={26} /></button>
-
-              <div className="relative group">
-                <div className={`absolute -inset-4 rounded-full border-2 border-white/20 transition-all duration-300 ${isRecording ? 'scale-125 opacity-100 animate-ping' : 'scale-100 opacity-40'}`} />
+              <button onClick={() => fileInputRef.current?.click()} className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-zinc-400 border border-white/10 active:scale-90"><ImageIcon size={26} /></button>
+              <div className="relative">
+                <div className={`absolute -inset-4 rounded-full border-2 border-white/20 transition-all ${isRecording ? 'scale-125 opacity-100 animate-ping' : 'opacity-40'}`} />
                 <button
                   onClick={captureMode === 'image' ? takePhoto : (isRecording ? stopRecording : startRecording)}
-                  className={`relative w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-all shadow-2xl z-10 ${isRecording ? 'bg-transparent' : 'bg-transparent'}`}
+                  className="relative w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-90 z-10"
                 >
-                  <div className={`transition-all duration-500 ${isRecording ? 'w-10 h-10 bg-red-600 rounded-2xl shadow-[0_0_30px_rgba(220,38,38,0.5)]' : captureMode === 'video' ? 'w-20 h-20 bg-red-600 rounded-full' : 'w-20 h-20 bg-white rounded-full shadow-inner'}`} />
+                  <div className={`transition-all duration-500 ${isRecording ? 'w-10 h-10 bg-red-600 rounded-2xl' : captureMode === 'video' ? 'w-20 h-20 bg-red-600 rounded-full' : 'w-20 h-20 bg-white rounded-full'}`} />
                 </button>
               </div>
-
-              <button onClick={() => setFacingMode(f => f === 'user' ? 'environment' : 'user')} className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-zinc-400 border border-white/10 hover:bg-white/10 active:scale-90 transition-all"><RefreshCw size={26} /></button>
+              <button onClick={() => setFacingMode(f => f === 'user' ? 'environment' : 'user')} className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-zinc-400 border border-white/10 active:scale-90"><RefreshCw size={26} /></button>
             </div>
           </>
         ) : (
@@ -349,7 +340,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
                   await onPost(mediaBlob!, captureMode, caption, (p, s) => setUploadStatus({ progress: p, stage: s }), thumbnailBlob);
                   onCancel();
                 }}
-                className="w-14 h-14 bg-blue-600 rounded-[1.4rem] text-white shadow-xl shadow-blue-600/30 active:scale-90 transition-all flex items-center justify-center disabled:opacity-50"
+                className="w-14 h-14 bg-blue-600 rounded-[1.4rem] text-white shadow-xl shadow-blue-600/30 flex items-center justify-center disabled:opacity-50"
               >
                 {uploadStatus ? <Loader2 className="animate-spin" size={24} /> : <Send size={24} className="ml-1" />}
               </button>
