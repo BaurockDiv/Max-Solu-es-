@@ -35,6 +35,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [ghostChat, setGhostChat] = useState<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -99,11 +100,23 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             if (initialBizId) {
                 const found = formatted.find(c =>
                     c.participant_1 === initialBizId ||
-                    c.participant_2 === initialBizId ||
-                    (c.other_participant as any)?.owner_id === initialBizId
+                    c.participant_2 === initialBizId
                 );
+
                 if (found) {
                     setActiveConv(found);
+                } else {
+                    // Chat Fantasma: Busca info do profissional para mostrar no header enquanto não há mensagens
+                    const { data: biz } = await supabase.from('businesses').select('name, logo').eq('owner_id', initialBizId).single();
+                    if (biz) {
+                        setGhostChat({
+                            id: 'ghost',
+                            other_participant: biz,
+                            participant_1: session.user.id,
+                            participant_2: initialBizId,
+                            status: 'pending'
+                        });
+                    }
                 }
             }
         } catch (err) {
@@ -126,15 +139,33 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     };
 
     const sendMessage = async () => {
-        if (!newMessage.trim() || !activeConv) return;
+        const currentConv = activeConv || ghostChat;
+        if (!newMessage.trim() || !currentConv) return;
 
         setSending(true);
         const content = newMessage;
         setNewMessage('');
 
         try {
+            let convId = currentConv.id;
+
+            // Se for chat fantasma, cria a conversa agora
+            if (convId === 'ghost') {
+                const { data: newConv, error: cErr } = await supabase.from('conversations').insert({
+                    participant_1: session.user.id,
+                    participant_2: currentConv.participant_2,
+                    status: 'pending',
+                    last_message: content
+                }).select().single();
+
+                if (cErr) throw cErr;
+                convId = newConv.id;
+                setActiveConv({ ...newConv, other_participant: currentConv.other_participant });
+                setGhostChat(null);
+            }
+
             const { error } = await supabase.from('messages').insert({
-                conversation_id: activeConv.id,
+                conversation_id: convId,
                 sender_id: session.user.id,
                 content: content,
                 type: 'text'
@@ -145,7 +176,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             await supabase.from('conversations').update({
                 last_message: content,
                 updated_at: new Date().toISOString()
-            }).eq('id', activeConv.id);
+            }).eq('id', convId);
 
         } catch (err) {
             console.error("Send error:", err);
@@ -168,9 +199,9 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             <div className="pt-12 pb-6 px-6 bg-white dark:bg-zinc-900/50 backdrop-blur-3xl border-b border-zinc-200 dark:border-zinc-800 shrink-0 z-20">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        {activeConv && (
+                        {(activeConv || ghostChat) && (
                             <button
-                                onClick={() => setActiveConv(null)}
+                                onClick={() => { setActiveConv(null); setGhostChat(null); }}
                                 className="p-2 -ml-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                             >
                                 <ArrowLeft size={20} className="text-zinc-600 dark:text-zinc-400" />
@@ -178,15 +209,15 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                         )}
                         <div>
                             <h1 className="text-2xl font-black text-zinc-950 dark:text-white uppercase tracking-tighter italic">
-                                {activeConv ? activeConv.other_participant?.name : 'Mensagens'}
+                                {activeConv ? activeConv.other_participant?.name : (ghostChat?.other_participant?.name || 'Mensagens')}
                             </h1>
                             <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest">
-                                {activeConv ? 'Online agora' : `${conversations.length} conversas ativas`}
+                                {activeConv || ghostChat ? 'Online agora' : `${conversations.length} conversas ativas`}
                             </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        {!activeConv ? (
+                        {(!activeConv && !ghostChat) ? (
                             <button className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-2xl text-zinc-600 dark:text-zinc-400">
                                 <Search size={20} />
                             </button>
@@ -201,13 +232,13 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             </div>
 
             <div className="flex-1 overflow-hidden relative">
-                {!activeConv ? (
+                {(!activeConv && !ghostChat) ? (
                     /* LISTA DE CONVERSAS */
                     <div className="h-full overflow-y-auto px-4 py-6 space-y-4 no-scrollbar">
                         {conversations.length > 0 ? conversations.map(c => (
                             <button
                                 key={c.id}
-                                onClick={() => setActiveConv(c)}
+                                onClick={() => { setActiveConv(c); setGhostChat(null); }}
                                 className="w-full flex items-center gap-5 p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] shadow-sm active:scale-[0.98] transition-all group overflow-hidden relative"
                             >
                                 {c.status === 'pending' && <div className="absolute top-0 right-0 bg-blue-600 text-white text-[8px] font-black px-4 py-1 uppercase tracking-widest rounded-bl-xl">Solicitação</div>}
