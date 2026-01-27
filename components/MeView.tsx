@@ -223,9 +223,17 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
   };
 
   const handleDeletePost = async (id: string) => {
-    if (!window.confirm("Deseja remover esta publicação?")) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert("Sessão expirada. Faça login novamente.");
+      return;
+    }
+
+    if (!window.confirm("Tem certeza que deseja remover esta publicação permanentemente?")) return;
+
     setDeletingId(id);
     try {
+      // O RLS no banco cuidará para garantir que o usuário logado é o dono do post
       const { error } = await supabase.from('posts').delete().eq('id', id);
       if (error) throw error;
       // Recarregar dados após deletar
@@ -239,6 +247,14 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
 
   const handleUpdatePost = async () => {
     if (!editingPost) return;
+
+    // Validate ownership before allowing update
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session || initialBusiness?.owner_id !== session.user.id) {
+      alert("Acesso negado. Você não é o proprietário desta empresa.");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const { error } = await supabase.from('posts').update({
