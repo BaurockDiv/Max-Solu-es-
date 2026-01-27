@@ -19,13 +19,12 @@ export interface Business {
   location: string;
   hours: string;
   links: Array<{ title: string; url: string }>;
-  contact: {
-    whatsapp?: string;
-    email?: string;
-    phone?: string;
-  };
+  whatsapp?: string;
+  email?: string;
+  phone?: string;
   rating: number;
   reviewCount: number;
+  owner_id?: string;
 }
 
 export interface Comment {
@@ -34,23 +33,23 @@ export interface Comment {
   userId: string;
   userEmail: string;
   text: string;
-  createdAt: string;
+  created_at: string;
 }
 
 export interface MediaPost {
   id: string;
-  businessId: string;
+  business_id: string;
   type: 'video' | 'image';
-  url: string;
-  thumbnail: string;
+  media_url: string;
+  thumbnail_url: string;
   caption: string;
-  ctaText: string;
-  ctaUrl: string;
+  cta_text?: string;
+  cta_url?: string;
   tags: string[];
   likes: number;
-  isAffiliate: boolean;
+  is_affiliate: boolean;
   business?: Business;
-  commentsCount?: number;
+  comments_count?: number;
 }
 
 export type ViewState = 'feed' | 'discovery' | 'profile' | 'following' | 'me' | 'record' | 'dashboard';

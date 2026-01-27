@@ -19,8 +19,8 @@ import {
   Mail,
   MapPin,
   Clock,
-  Globe,
-  Check
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import { Business, Category } from '../types';
 
@@ -64,16 +64,11 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
     email: ''
   });
 
-  // Re-hidrata o formulário toda vez que o negócio inicial muda ou a tela de edição abre
   useEffect(() => {
     if (initialBusiness) {
       const hoursStr = initialBusiness.hours || "Seg, Ter, Qua, Qui, Sex, 09:00 - 18:00";
       const parts = hoursStr.split(', ');
-      
-      // Filtra apenas os IDs válidos de dias da semana
       const daysFound = parts.filter(p => DAYS_OF_WEEK.some(d => d.id === p));
-      
-      // Busca o horário (último elemento da string após as vírgulas)
       const timePart = parts[parts.length - 1] || "09:00 - 18:00";
       const [open = "09:00", close = "18:00"] = timePart.includes(' - ') ? timePart.split(' - ') : ["09:00", "18:00"];
 
@@ -86,9 +81,9 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
         openTime: open.trim(),
         closeTime: close.trim(),
         selectedDays: daysFound.length > 0 ? daysFound : ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'],
-        whatsapp: initialBusiness.contact?.whatsapp || '',
-        phone: initialBusiness.contact?.phone || '',
-        email: initialBusiness.contact?.email || ''
+        whatsapp: initialBusiness.whatsapp || '',
+        phone: initialBusiness.phone || '',
+        email: initialBusiness.email || ''
       });
     }
   }, [initialBusiness, activeView]);
@@ -99,8 +94,6 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
       const newDays = isSelected 
         ? prev.selectedDays.filter((d: string) => d !== dayId)
         : [...prev.selectedDays, dayId];
-      
-      // Mantém a ordem da semana
       return { ...prev, selectedDays: newDays.sort((a: string, b: string) => 
         DAYS_OF_WEEK.findIndex(d => d.id === a) - DAYS_OF_WEEK.findIndex(d => d.id === b)
       )};
@@ -121,11 +114,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
         
         const { data, error: uploadError } = await supabase.storage
           .from('media')
-          .upload(fileName, arrayBuffer, {
-            contentType: file.type || 'image/jpeg',
-            cacheControl: '3600',
-            upsert: true
-          });
+          .upload(fileName, arrayBuffer, { contentType: file.type || 'image/jpeg', upsert: true });
           
         if (uploadError) throw uploadError;
         
@@ -133,26 +122,19 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
         setFormData((prev: any) => ({ ...prev, logo: publicUrl }));
         
         if (initialBusiness) {
-          const { error: updErr } = await supabase.from('businesses').update({ logo: publicUrl }).eq('id', initialBusiness.id);
-          if (updErr) throw updErr;
-          
+          await supabase.from('businesses').update({ logo: publicUrl }).eq('id', initialBusiness.id);
           const { data: updated } = await supabase.from('businesses').select('*').eq('id', initialBusiness.id).single();
           if (updated) onUpdateBusiness(updated as any);
         }
       } catch (err: any) {
         setError(err.message);
-      } finally {
-        setIsUploading(false);
-      }
+      } finally { setIsUploading(false); }
     }
   };
 
   const handleSaveProfile = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!formData.name.trim()) {
-      setError("O nome do negócio é obrigatório.");
-      return;
-    }
+    if (!formData.name.trim()) return setError("O nome do negócio é obrigatório.");
 
     setIsSaving(true);
     setError(null);
@@ -168,40 +150,30 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
       logo: formData.logo,
       hours: finalHours,
       owner_id: session.user.id,
-      contact: {
-        whatsapp: formData.whatsapp.toString().replace(/\D/g, ''),
-        phone: formData.phone,
-        email: formData.email
-      }
+      whatsapp: formData.whatsapp.toString().replace(/\D/g, ''),
+      phone: formData.phone,
+      email: formData.email
     };
 
     try {
-      let error;
+      let result;
       if (initialBusiness) {
-        ({ error } = await supabase.from('businesses').update(payload).eq('id', initialBusiness.id));
+        result = await supabase.from('businesses').update(payload).eq('id', initialBusiness.id);
       } else {
-        ({ error } = await supabase.from('businesses').insert(payload));
+        result = await supabase.from('businesses').insert(payload);
       }
       
-      if (error) throw error;
+      if (result.error) throw result.error;
 
-      // Busca os dados fresquinhos do banco para garantir sincronia
-      const { data: updated, error: fetchErr } = await supabase.from('businesses').select('*').eq('owner_id', session.user.id).single();
-      if (fetchErr) throw fetchErr;
-
+      const { data: updated } = await supabase.from('businesses').select('*').eq('owner_id', session.user.id).single();
       if (updated) {
         onUpdateBusiness(updated as any);
         setSaveSuccess(true);
-        setTimeout(() => { 
-          setSaveSuccess(false); 
-          setActiveView('main'); 
-        }, 1000);
+        setTimeout(() => { setSaveSuccess(false); setActiveView('main'); }, 1200);
       }
     } catch (err: any) {
       setError(err.message);
-    } finally { 
-      setIsSaving(false); 
-    }
+    } finally { setIsSaving(false); }
   };
 
   return (
@@ -225,7 +197,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
           {!initialBusiness ? (
             <div className="p-8 bg-blue-600/5 border-2 border-dashed border-blue-600/20 rounded-[2.5rem] text-center space-y-4">
                <PlusCircle className="mx-auto text-blue-600" size={32} />
-               <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest leading-relaxed">Crie seu perfil profissional para começar a publicar.</p>
+               <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest leading-relaxed">Crie seu perfil profissional para começar.</p>
                <button onClick={() => setActiveView('edit-profile')} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20">Configurar Agora</button>
             </div>
           ) : (
@@ -249,9 +221,9 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
               <div className="p-6 bg-zinc-50 dark:bg-zinc-950 rounded-[2rem] border border-zinc-100 dark:border-zinc-900 space-y-4">
                 <h3 className="text-[8px] font-black text-zinc-400 uppercase tracking-[0.3em] ml-2">Atalhos de Contato</h3>
                 <div className="grid grid-cols-3 gap-2">
-                  <QuickContact icon={<MessageCircle size={16}/>} label="Whats" value={initialBusiness.contact?.whatsapp} />
-                  <QuickContact icon={<Phone size={16}/>} label="Fone" value={initialBusiness.contact?.phone} />
-                  <QuickContact icon={<Mail size={16}/>} label="Email" value={initialBusiness.contact?.email} />
+                  <QuickContact icon={<MessageCircle size={16}/>} label="Whats" value={initialBusiness.whatsapp} />
+                  <QuickContact icon={<Phone size={16}/>} label="Fone" value={initialBusiness.phone} />
+                  <QuickContact icon={<Mail size={16}/>} label="Email" value={initialBusiness.email} />
                 </div>
               </div>
             </div>
@@ -263,17 +235,14 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
       {/* VIEW DE EDIÇÃO (OVERLAY) */}
       {activeView === 'edit-profile' && (
         <div className="absolute inset-0 bg-white dark:bg-black z-[100] flex flex-col animate-in slide-in-from-bottom duration-300">
-          {/* Header Compacto */}
           <div className="flex items-center justify-between p-4 border-b border-zinc-100 dark:border-zinc-900 bg-white dark:bg-black shrink-0 relative z-10">
             <button onClick={() => setActiveView('main')} className="text-zinc-500 w-9 h-9 rounded-xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center active:scale-90 transition-all"><X size={18} /></button>
-            <h2 className="text-[9px] font-black uppercase tracking-widest text-black dark:text-white">Editar Perfil</h2>
+            <h2 className="text-[9px] font-black uppercase tracking-widest text-black dark:text-white text-center flex-1">Ajustes</h2>
             <div className="w-9" />
           </div>
           
-          {/* Conteúdo com Scroll */}
-          <div className="flex-1 overflow-y-auto px-5 py-6 hide-scrollbar pb-24">
+          <div className="flex-1 overflow-y-auto px-5 py-6 hide-scrollbar pb-32">
             <div className="space-y-8">
-              {/* Logo Circle */}
               <div className="flex flex-col items-center space-y-3">
                 <div className="relative cursor-pointer" onClick={() => !isUploading && fileInputRef.current?.click()}>
                   <div className="w-24 h-24 rounded-[2.2rem] overflow-hidden border-2 border-blue-600/10 shadow-xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center">
@@ -282,31 +251,36 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
                   <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white border-2 border-white dark:border-black shadow-lg"><Camera size={14} /></div>
                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleLogoChange} />
                 </div>
-                {error && <p className="text-[8px] text-red-500 font-black uppercase text-center px-4 leading-tight">{error}</p>}
+                
+                {error && (
+                  <div className="bg-red-50 dark:bg-red-900/10 p-5 rounded-2xl border border-red-500/20 flex gap-3 items-center mx-1 animate-in shake duration-300">
+                    <AlertCircle className="text-red-500 shrink-0" size={20} />
+                    <p className="text-[9px] text-red-600 font-black uppercase leading-relaxed">{error}</p>
+                  </div>
+                )}
               </div>
 
               <form id="profile-form" onSubmit={handleSaveProfile} className="space-y-8">
                 <div className="space-y-4">
                   <SectionHeader icon={<User size={12}/>} title="Identidade" />
                   <InputGroup label="Nome do Negócio" value={formData.name} onChange={v => setFormData({...formData, name: v})} placeholder="Ex: Studio Biz" />
-                  
                   <div className="space-y-1.5">
                     <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-1">Categoria</label>
-                    <select className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-black text-black dark:text-white outline-none" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as Category})}>
+                    <select className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3 text-xs font-black text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as Category})}>
                         {Object.values(Category).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <SectionHeader icon={<MessageCircle size={12}/>} title="Canais Diretos" />
+                  <SectionHeader icon={<MessageCircle size={12}/>} title="Contato Direto" />
                   <div className="grid grid-cols-2 gap-3">
                     <InputGroup 
                       icon={<MessageCircle size={12}/>} 
                       label="WhatsApp" 
                       value={formData.whatsapp} 
                       onChange={v => setFormData({...formData, whatsapp: v})} 
-                      placeholder="DDD + Número" 
+                      placeholder="Somente Números" 
                     />
                     <InputGroup 
                       icon={<Phone size={12}/>} 
@@ -316,28 +290,27 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
                       placeholder="Fixo/Celular" 
                     />
                   </div>
-                  <InputGroup icon={<Mail size={12}/>} label="E-mail" value={formData.email} onChange={v => setFormData({...formData, email: v})} placeholder="contato@voce.com" />
-                  <InputGroup icon={<MapPin size={12}/>} label="Cidade / Localização" value={formData.location} onChange={v => setFormData({...formData, location: v})} placeholder="Ex: São Paulo, SP" />
+                  <InputGroup icon={<Mail size={12}/>} label="E-mail Público" value={formData.email} onChange={v => setFormData({...formData, email: v})} placeholder="contato@voce.com" />
+                  <InputGroup icon={<MapPin size={12}/>} label="Localização" value={formData.location} onChange={v => setFormData({...formData, location: v})} placeholder="Cidade, UF" />
                 </div>
 
                 <div className="space-y-4">
-                  <SectionHeader icon={<Clock size={12}/>} title="Dias e Horários" />
+                  <SectionHeader icon={<Clock size={12}/>} title="Atendimento" />
                   <div className="space-y-2">
-                    <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-1">Selecione os Dias</label>
+                    <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-1">Dias da Semana</label>
                     <div className="flex justify-between gap-1">
                       {DAYS_OF_WEEK.map(day => (
                         <button
                           key={day.id}
                           type="button"
                           onClick={() => toggleDay(day.id)}
-                          className={`flex-1 h-9 rounded-lg text-[10px] font-black transition-all flex items-center justify-center ${formData.selectedDays.includes(day.id) ? 'bg-blue-600 text-white shadow-md' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 border border-zinc-100 dark:border-zinc-800'}`}
+                          className={`flex-1 h-9 rounded-full text-[10px] font-black transition-all flex items-center justify-center ${formData.selectedDays.includes(day.id) ? 'bg-blue-600 text-white shadow-md' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 border border-zinc-100 dark:border-zinc-800'}`}
                         >
                           {day.label}
                         </button>
                       ))}
                     </div>
                   </div>
-
                   <div className="flex gap-3">
                     <InputGroup label="Abre às" value={formData.openTime} onChange={v => setFormData({...formData, openTime: v})} type="time" />
                     <InputGroup label="Fecha às" value={formData.closeTime} onChange={v => setFormData({...formData, closeTime: v})} type="time" />
@@ -346,22 +319,22 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
 
                 <div className="space-y-1.5">
                   <label className="text-[8px] font-black text-zinc-400 uppercase tracking-widest ml-1">Bio Profissional</label>
-                  <textarea className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-xl p-4 text-xs font-bold border border-zinc-100 dark:border-zinc-800 text-black dark:text-white h-20 resize-none outline-none focus:ring-1 focus:ring-blue-500" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} />
+                  <textarea className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-xl p-4 text-xs font-bold border border-zinc-100 dark:border-zinc-800 text-black dark:text-white h-24 resize-none outline-none focus:ring-1 focus:ring-blue-500" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} />
                 </div>
               </form>
             </div>
           </div>
 
-          {/* Botão Floating Slim Fixo */}
-          <div className="absolute bottom-6 left-6 right-6 z-[110] pointer-events-none">
+          {/* Botão Floating Ultra-Slim Pill com Efeito Glass */}
+          <div className="absolute bottom-8 left-8 right-8 z-[110] pointer-events-none">
             <button 
               form="profile-form"
               type="submit" 
               disabled={isSaving || isUploading} 
-              className={`w-full py-3 rounded-xl font-black text-[9px] uppercase tracking-[0.2em] transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-2 pointer-events-auto ${saveSuccess ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'}`}
+              className={`w-full h-12 rounded-full font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-2 pointer-events-auto border border-white/20 backdrop-blur-md ${saveSuccess ? 'bg-green-600/90 text-white' : 'bg-blue-600/90 text-white'}`}
             >
-              {isSaving ? <Loader2 className="animate-spin" size={12}/> : saveSuccess ? <Check size={12}/> : null}
-              {isSaving ? 'Salvando...' : saveSuccess ? 'Perfil Salvo!' : 'Confirmar Ajustes'}
+              {isSaving ? <Loader2 className="animate-spin" size={14}/> : saveSuccess ? <Check size={14}/> : null}
+              {isSaving ? 'Sincronizando...' : saveSuccess ? 'Perfil Fixado!' : 'Confirmar Ajustes'}
             </button>
           </div>
         </div>

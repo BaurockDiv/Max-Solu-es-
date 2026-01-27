@@ -15,7 +15,9 @@ export const MOCK_BUSINESSES: Record<string, Business> = {
       { title: 'Order Online', url: '#' },
       { title: 'Instagram', url: '#' }
     ],
-    contact: { whatsapp: '1234567890', email: 'hello@artisanbrews.com' },
+    // Fix: Business interface uses individual optional fields for contact info
+    whatsapp: '1234567890',
+    email: 'hello@artisanbrews.com',
     rating: 4.8,
     reviewCount: 124
   },
@@ -32,7 +34,8 @@ export const MOCK_BUSINESSES: Record<string, Business> = {
       { title: 'Portfolio', url: '#' },
       { title: 'Hire Us', url: '#' }
     ],
-    contact: { email: 'info@swiftcode.dev' },
+    // Fix: Business interface uses individual optional fields for contact info
+    email: 'info@swiftcode.dev',
     rating: 5.0,
     reviewCount: 45
   },
@@ -49,7 +52,8 @@ export const MOCK_BUSINESSES: Record<string, Business> = {
       { title: 'Airbnb Listing', url: '#' },
       { title: 'Direct Booking', url: '#' }
     ],
-    contact: { phone: '9876543210' },
+    // Fix: Business interface uses individual optional fields for contact info
+    phone: '9876543210',
     rating: 4.9,
     reviewCount: 230
   }
@@ -58,41 +62,44 @@ export const MOCK_BUSINESSES: Record<string, Business> = {
 export const MOCK_POSTS: MediaPost[] = [
   {
     id: 'p1',
-    businessId: 'b1',
+    // Fix: MediaPost interface uses snake_case for business_id, media_url, thumbnail_url, etc.
+    business_id: 'b1',
     type: 'video',
-    url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    thumbnail: 'https://picsum.photos/id/100/1080/1920',
+    media_url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    thumbnail_url: 'https://picsum.photos/id/100/1080/1920',
     caption: 'Fresh morning pour! ☕ Come experience the best beans in NYC.',
-    ctaText: 'View Menu',
-    ctaUrl: '#',
+    cta_text: 'View Menu',
+    cta_url: '#',
     tags: ['#coffee', '#nyc', '#artisan'],
     likes: 1240,
-    isAffiliate: false
+    is_affiliate: false
   },
   {
     id: 'p2',
-    businessId: 'b3',
+    // Fix: MediaPost interface uses snake_case properties
+    business_id: 'b3',
     type: 'image',
-    url: 'https://picsum.photos/id/1016/1080/1920',
-    thumbnail: 'https://picsum.photos/id/1016/1080/1920',
+    media_url: 'https://picsum.photos/id/1016/1080/1920',
+    thumbnail_url: 'https://picsum.photos/id/1016/1080/1920',
     caption: 'The view from our newest tiny home is absolutely breathtaking.',
-    ctaText: 'Book Now',
-    ctaUrl: '#',
+    cta_text: 'Book Now',
+    cta_url: '#',
     tags: ['#travel', '#nature', '#tinyhome'],
     likes: 890,
-    isAffiliate: false
+    is_affiliate: false
   },
   {
     id: 'p3',
-    businessId: 'b2',
+    // Fix: MediaPost interface uses snake_case properties
+    business_id: 'b2',
     type: 'image',
-    url: 'https://picsum.photos/id/101/1080/1920',
-    thumbnail: 'https://picsum.photos/id/101/1080/1920',
+    media_url: 'https://picsum.photos/id/101/1080/1920',
+    thumbnail_url: 'https://picsum.photos/id/101/1080/1920',
     caption: 'Just launched! 🚀 Our new design system for client projects.',
-    ctaText: 'Free Consultation',
-    ctaUrl: '#',
+    cta_text: 'Free Consultation',
+    cta_url: '#',
     tags: ['#development', '#uxui', '#startup'],
     likes: 560,
-    isAffiliate: true
+    is_affiliate: true
   }
 ];

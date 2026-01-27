@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
-import { Home, Search, Users, User, PlusSquare, LogIn, AlertTriangle, X } from 'lucide-react';
+import { Home, Search, Users, User, PlusSquare, LogIn, AlertTriangle, X, Database } from 'lucide-react';
 import { ViewState, Business, MediaPost } from './types';
 import FeedView from './components/FeedView';
 import DiscoveryView from './components/DiscoveryView';
@@ -20,7 +20,7 @@ const App: React.FC = () => {
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [allPosts, setAllPosts] = useState<MediaPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorModal, setErrorModal] = useState<{title: string, msg: string} | null>(null);
+  const [errorModal, setErrorModal] = useState<{title: string, msg: string, isSql?: boolean} | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('bizstream-theme') as 'light' | 'dark') || 'dark');
 
   useEffect(() => {
@@ -55,7 +55,14 @@ const App: React.FC = () => {
   }, []);
 
   const fetchUserBusiness = async (userId: string) => {
-    const { data } = await supabase.from('businesses').select('*').eq('owner_id', userId).single();
+    const { data, error } = await supabase.from('businesses').select('*').eq('owner_id', userId).single();
+    if (error && error.message.includes('column')) {
+       setErrorModal({
+         title: "Banco de Dados Incompleto",
+         msg: "As colunas de contato (email, whatsapp, phone) não existem no seu Supabase. Execute o script SQL para corrigir.",
+         isSql: true
+       });
+    }
     if (data) setUserBusiness(data as any);
   };
 
@@ -68,7 +75,6 @@ const App: React.FC = () => {
 
   const handleUpdateBusiness = (updated: Business) => {
     setUserBusiness(updated);
-    // Sincroniza o feed global com as novas informações da empresa (logo, nome, etc)
     fetchData();
   };
 
@@ -142,15 +148,15 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-y-auto hide-scrollbar relative z-0">{renderContent()}</main>
       
       {errorModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white dark:bg-zinc-900 w-full rounded-[2rem] p-8 shadow-2xl border border-red-500/20">
-             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-2xl flex items-center justify-center text-red-600 mb-6">
-                <AlertTriangle size={32} />
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+          <div className="bg-white dark:bg-zinc-900 w-full rounded-[2.5rem] p-8 shadow-2xl border border-red-500/20 animate-in zoom-in duration-300">
+             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 ${errorModal.isSql ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+                {errorModal.isSql ? <Database size={32} /> : <AlertTriangle size={32} />}
              </div>
              <h3 className="text-xl font-black uppercase mb-2 tracking-tight">{errorModal.title}</h3>
-             <p className="text-zinc-500 text-sm leading-relaxed mb-8">{errorModal.msg}</p>
-             <button onClick={() => setErrorModal(null)} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-                <X size={16} /> Fechar Aviso
+             <p className="text-zinc-500 text-xs leading-relaxed mb-8">{errorModal.msg}</p>
+             <button onClick={() => setErrorModal(null)} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
+                <X size={16} /> Entendi
              </button>
           </div>
         </div>
