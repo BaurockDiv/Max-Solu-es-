@@ -84,75 +84,22 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   };
 
   const startCamera = async () => {
-    console.log("Starting camera...");
     stopCamera();
-
-    // Pequeno delay para garantir que o elemento video existe no DOM (especialmente após mudar de aba)
-    await new Promise(resolve => setTimeout(resolve, 50));
-
     try {
-      const config = qualityConfig[quality];
-      let stream: MediaStream | null = null;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facingMode } },
+        audio: true
+      });
 
-      // Lista de tentativas do mais avançado ao mais básico
-      const attempts = [
-        // 1. Ideal (com qualidade solicitada)
-        {
-          video: {
-            facingMode: { ideal: facingMode },
-            width: { ideal: config.width },
-            height: { ideal: config.height },
-            frameRate: { ideal: 30 }
-          },
-          audio: { echoCancellation: true, noiseSuppression: true }
-        },
-        // 2. Compatível (apenas orientação)
-        {
-          video: { facingMode: { ideal: facingMode } },
-          audio: true
-        },
-        // 3. Super Básico (qualquer câmera)
-        {
-          video: true,
-          audio: true
-        }
-      ];
-
-      for (const constraints of attempts) {
-        try {
-          console.log("Attempting constraints:", constraints);
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-          if (stream) break;
-        } catch (err) {
-          console.warn("Attempt failed, trying next level...", err);
-        }
-      }
-
-      if (stream) {
+      if (stream && videoRef.current) {
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-
-          // Alguns navegadores mobile exigem carregamento de metadados
-          videoRef.current.onloadedmetadata = async () => {
-            try {
-              if (videoRef.current) {
-                await videoRef.current.play();
-                console.log("Camera playing successfully");
-              }
-            } catch (playErr) {
-              console.error("Manual play error:", playErr);
-            }
-          };
-        }
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
         setError(null);
-        setFlashLevel(0);
-      } else {
-        throw new Error("Não foi possível obter nenhum stream de média.");
       }
     } catch (e: any) {
-      console.error("Global Camera Error:", e);
-      setError("Permissão de câmera negada ou erro de hardware. Tente recarregar a página.");
+      console.error("Camera Error:", e);
+      setError("Permissão de câmera negada ou erro de hardware.");
     }
   };
 
@@ -306,7 +253,13 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
                 </button>
               </div>
             ) : (
-              <video ref={videoRef} autoPlay muted playsInline className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} />
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+              />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
           </>
