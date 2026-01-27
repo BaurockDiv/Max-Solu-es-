@@ -464,78 +464,99 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
                   )}
                 </div>
 
-                {/* Seeder de Teste - 30 Contas */}
-                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-blue-600/5">
+                {/* Seeder de Estresse - 30 Contas (Blindado) */}
+                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-blue-600/5 space-y-3">
                   <button
                     id="seed-btn"
                     onClick={async (e) => {
-                      if (!window.confirm("Isso criará 30 perfis e cerca de 60 posts. Deseja continuar?")) return;
+                      if (!window.confirm("Gerar 30 contas de teste agora?")) return;
                       const target = e.currentTarget;
                       target.disabled = true;
-                      target.innerText = "CRIAÇÃO EM ANDAMENTO...";
+                      target.innerText = "PREPARANDO...";
+
+                      const categories = ['Estética', 'TI', 'Saúde', 'Gastronomia', 'Construção', 'Pet Shop', 'Moda'];
+                      const bases = ["Studio", "Master", "Prime", "Elite", "Global", "Nexus", "Alpha", "Star", "Mega", "Delta"];
 
                       try {
-                        const categories = ['Estética', 'Manutenção', 'Gastronomia', 'TI', 'Construção', 'Serviços'];
-                        const bases = ["Premium", "Max", "Star", "Mega", "Alpha", "Global", "Nova", "Elite", "Prime", "Studio"];
-
                         for (let i = 0; i < 30; i++) {
                           const cat = categories[i % categories.length];
-                          const name = `[TESTE] ${bases[i % bases.length]} Professional ${i + 1}`;
+                          const name = `[TESTE] ${bases[i % bases.length]} ${i + 1}`;
 
+                          target.innerText = `CRIANDO (${i + 1}/30)...`;
+
+                          // Tenta inserir a empresa
                           const { data: bData, error: bErr } = await supabase.from('businesses').insert({
                             name,
                             category: cat,
-                            description: `Excelência em ${cat}. Atendimento personalizado e garantia de satisfação.`,
-                            logo: `https://picsum.photos/seed/${name.replace(/ /g, '')}/200/200`,
-                            owner_id: crypto.randomUUID()
-                          }).select().single();
+                            description: `Perfil profissional de teste para estresse do feed. Categoria: ${cat}.`,
+                            logo: `https://picsum.photos/seed/stress_${i}/200`,
+                            owner_id: session?.user?.id || crypto.randomUUID(), // Prioriza seu ID para rodar com RLS ativo
+                            whatsapp: "(11) 99999-9999"
+                          }).select(); // Removido .single() para evitar falhas de select-policy
 
-                          if (bData) {
-                            for (let j = 1; j <= 2; j++) {
-                              await supabase.from('posts').insert({
-                                business_id: bData.id,
-                                media_url: `https://picsum.photos/seed/p${bData.id}${j}/800/1000`,
+                          if (bErr) throw new Error(`Erro na Empresa ${i}: ${bErr.message}`);
+
+                          if (bData && bData[0]) {
+                            const bizId = bData[0].id;
+                            const { error: pErr } = await supabase.from('posts').insert([
+                              {
+                                business_id: bizId,
+                                media_url: `https://picsum.photos/seed/tp1${bizId}/800/1000`,
                                 type: 'image',
-                                caption: `Trabalho de hoje na ${name}! Qualidade máxima. #serviço #${cat.toLowerCase()}`,
-                                likes: Math.floor(Math.random() * 80)
-                              });
-                            }
+                                caption: `Resultado do dia! Especialidade em ${cat}. #teste #stress`,
+                                likes: Math.floor(Math.random() * 500)
+                              },
+                              {
+                                business_id: bizId,
+                                media_url: `https://picsum.photos/seed/tp2${bizId}/800/1000`,
+                                type: 'image',
+                                caption: `Qualidade Máxima com ${name}. Venha conferir! #test #app`,
+                                likes: Math.floor(Math.random() * 150)
+                              }
+                            ]);
+                            if (pErr) console.warn("Erro ao inserir posts:", pErr.message);
                           }
-                          if (i % 5 === 0) console.log(`Criados ${i} perfis...`);
                         }
-                        alert("30 Contas e 60 Posts gerados com sucesso!");
+                        alert("Sucesso! 30 profissionais e 60 publicações criadas.");
                         window.location.reload();
-                      } catch (err) {
+                      } catch (err: any) {
                         console.error(err);
-                        alert("Erro ao gerar dados. Verifique o console.");
+                        alert(`FALHA NA GERAÇÃO:\n${err.message}\n\nVerifique se o SQL foi rodado corretamente.`);
+                      } finally {
                         target.disabled = false;
-                        target.innerText = "TENTAR GERAR NOVAMENTE";
+                        target.innerText = "🚀 GERAR 30 CONTAS DE TESTE";
                       }
                     }}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest shadow-xl shadow-blue-500/10 active:scale-95 transition-all"
+                    className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg"
                   >
                     🚀 Gerar 30 Contas de Teste
                   </button>
-                  <p className="mt-2 text-[8px] text-zinc-500 font-bold text-center uppercase tracking-tighter italic">Ideal para testar o feed e as categorias</p>
+
                   <button
                     onClick={async (e) => {
-                      if (!window.confirm("Remover TODAS as contas de [TESTE]?")) return;
+                      if (!window.confirm("Apagar todas as contas de teste?")) return;
                       const target = e.currentTarget;
                       target.disabled = true;
-                      target.innerText = "LIMPANDO...";
+                      target.innerText = "LIMPANDO BANCO...";
                       try {
                         const { data: testBiz } = await supabase.from('businesses').select('id').ilike('name', '[TESTE]%');
                         if (testBiz && testBiz.length > 0) {
                           const ids = testBiz.map(b => b.id);
                           await supabase.from('posts').delete().in('business_id', ids);
                           await supabase.from('businesses').delete().in('id', ids);
-                          alert("Limpeza concluída.");
+                          alert("Dados limpos com sucesso.");
                           window.location.reload();
+                        } else {
+                          alert("Nada para limpar.");
                         }
-                      } catch (err) { console.error(err); }
-                      finally { target.disabled = false; target.innerText = "🗑️ LIMPAR DADOS DE TESTE"; }
+                      } catch (err: any) {
+                        alert("Erro ao apagar: " + err.message);
+                      } finally {
+                        target.disabled = false;
+                        target.innerText = "🗑️ LIMPAR DADOS DE TESTE";
+                      }
                     }}
-                    className="w-full mt-3 py-2 bg-red-600/10 text-red-600 rounded-xl text-[8px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                    className="w-full py-3 bg-red-600/10 text-red-600 rounded-xl text-[8px] font-black uppercase tracking-widest active:scale-95 transition-all"
                   >
                     🗑️ Limpar Dados de Teste
                   </button>
