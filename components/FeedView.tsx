@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState, memo } from 'react';
-import { Heart, MessageCircle, Share2, Volume2, VolumeX, Maximize2, CheckCircle2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Volume2, VolumeX, Maximize2, CheckCircle2, LayoutGrid } from 'lucide-react';
 import { MediaPost } from '../types';
 
 interface FeedViewProps {
@@ -15,7 +15,12 @@ const FeedView: React.FC<FeedViewProps> = ({ posts, onProfileClick, hideFollowBu
 
   // Se não houver posts
   if (posts.length === 0) return (
-    <div className="h-full flex items-center justify-center bg-black text-zinc-600 font-black uppercase tracking-widest text-[10px]">Sem novidades na região</div>
+    <div className="h-full flex flex-col items-center justify-center bg-white dark:bg-black p-10 text-center space-y-4">
+      <div className="w-20 h-20 rounded-3xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center text-zinc-200 dark:text-zinc-800">
+        <LayoutGrid size={40} />
+      </div>
+      <p className="text-zinc-400 dark:text-zinc-600 font-black uppercase tracking-[0.3em] text-[10px]">Sem novidades na região</p>
+    </div>
   );
 
   return (

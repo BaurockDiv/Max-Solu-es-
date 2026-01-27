@@ -1,11 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { 
-  User, 
-  Settings, 
-  LogOut, 
-  ChevronRight, 
+import {
+  User,
+  Settings,
+  LogOut,
+  ChevronRight,
   X,
   Camera,
   Sun,
@@ -54,7 +54,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
   const [isUploading, setIsUploading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Estados para nova senha
   const [showPassForm, setShowPassForm] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -126,12 +126,14 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
   const toggleDay = (dayId: string) => {
     setFormData((prev: any) => {
       const isSelected = prev.selectedDays.includes(dayId);
-      const newDays = isSelected 
+      const newDays = isSelected
         ? prev.selectedDays.filter((d: string) => d !== dayId)
         : [...prev.selectedDays, dayId];
-      return { ...prev, selectedDays: newDays.sort((a: string, b: string) => 
-        DAYS_OF_WEEK.findIndex(d => d.id === a) - DAYS_OF_WEEK.findIndex(d => d.id === b)
-      )};
+      return {
+        ...prev, selectedDays: newDays.sort((a: string, b: string) =>
+          DAYS_OF_WEEK.findIndex(d => d.id === a) - DAYS_OF_WEEK.findIndex(d => d.id === b)
+        )
+      };
     });
   };
 
@@ -146,16 +148,16 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
         const fileExt = file.name.split('.').pop() || 'jpg';
         const fileName = `logos/${session.user.id}-${Date.now()}.${fileExt}`;
         const arrayBuffer = await file.arrayBuffer();
-        
+
         const { data, error: uploadError } = await supabase.storage
           .from('media')
           .upload(fileName, arrayBuffer, { contentType: file.type || 'image/jpeg', upsert: true });
-          
+
         if (uploadError) throw uploadError;
-        
+
         const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(data.path);
         setFormData((prev: any) => ({ ...prev, logo: publicUrl }));
-        
+
         if (initialBusiness) {
           await supabase.from('businesses').update({ logo: publicUrl }).eq('id', initialBusiness.id);
           const { data: updated } = await supabase.from('businesses').select('*').eq('id', initialBusiness.id).single();
@@ -176,7 +178,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
 
     const daysStr = formData.selectedDays.join(', ');
     const finalHours = `${daysStr}, ${formData.openTime} - ${formData.closeTime}`;
-    
+
     const payload = {
       name: formData.name,
       bio: formData.bio,
@@ -197,7 +199,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
       } else {
         result = await supabase.from('businesses').insert(payload);
       }
-      
+
       if (result.error) throw result.error;
 
       const { data: updated } = await supabase.from('businesses').select('*').eq('owner_id', session.user.id).single();
@@ -215,12 +217,12 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
     <div className="flex-1 flex flex-col relative bg-white dark:bg-black overflow-hidden animate-gpu">
       {/* VIEW PRINCIPAL */}
       <div className={`flex-1 flex flex-col overflow-y-auto hide-scrollbar transition-all duration-300 ${activeView === 'edit-profile' ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
-        <div className="px-6 py-14 flex flex-col items-center text-center space-y-4 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-100 dark:border-zinc-900 rounded-b-[4rem] flex-shrink-0">
+        <div className="px-6 py-14 flex flex-col items-center text-center space-y-4 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 rounded-b-[4rem] flex-shrink-0">
           <div className="relative">
             <div className="w-24 h-24 rounded-[2.5rem] p-1 bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-2xl">
               <img src={initialBusiness?.logo || 'https://picsum.photos/200/200'} className="w-full h-full rounded-[2.3rem] object-cover border-[3px] border-white dark:border-black" alt="Profile" />
             </div>
-            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white border-4 border-white dark:border-zinc-950">
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white border-4 border-white dark:border-zinc-900">
               <TrendingUp size={14} />
             </div>
           </div>
@@ -233,9 +235,9 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
         <div className="p-6 space-y-6 pb-28">
           {!initialBusiness ? (
             <div className="p-12 bg-blue-600/5 border-2 border-dashed border-blue-600/20 rounded-[2.5rem] text-center space-y-5">
-               <PlusCircle className="mx-auto text-blue-600" size={44} />
-               <p className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.2em] leading-relaxed">Ative sua presença profissional na rede.</p>
-               <button onClick={() => setActiveView('edit-profile')} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all">Começar Agora</button>
+              <PlusCircle className="mx-auto text-blue-600" size={44} />
+              <p className="text-[11px] font-black uppercase text-zinc-500 tracking-[0.2em] leading-relaxed">Ative sua presença profissional na rede.</p>
+              <button onClick={() => setActiveView('edit-profile')} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all">Começar Agora</button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -243,67 +245,67 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
                 <div className="flex items-center gap-4"><LayoutDashboard size={22} /><span className="text-[11px] font-black uppercase tracking-widest">Painel de Métricas</span></div>
                 <TrendingUp size={18} />
               </button>
-              
-              <div className="bg-zinc-50 dark:bg-zinc-950 rounded-[2.4rem] border border-zinc-100 dark:border-zinc-900 overflow-hidden shadow-sm">
-                 <button onClick={() => setActiveView('edit-profile')} className="w-full flex items-center justify-between p-6 hover:bg-zinc-100 dark:hover:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-900 transition-colors">
-                    <div className="flex items-center gap-4"><Settings size={22} className="text-blue-500"/><span className="text-[11px] font-black uppercase text-black dark:text-white tracking-tight">Editar Negócio</span></div>
-                    <ChevronRight size={20} className="text-zinc-300"/>
-                 </button>
-                 
-                 {/* Seção de Segurança Atualizada - Alteração Direta */}
-                 <div className="p-6 border-b border-zinc-100 dark:border-zinc-900">
-                    <button 
-                      onClick={() => setShowPassForm(!showPassForm)}
-                      className="w-full flex items-center justify-between transition-all"
-                    >
-                      <div className="flex items-center gap-4"><ShieldCheck size={22} className="text-zinc-400"/><span className="text-[11px] font-black uppercase text-black dark:text-white tracking-tight">Segurança & Senha</span></div>
-                      <ChevronDown size={18} className={`text-zinc-300 transition-transform duration-300 ${showPassForm ? 'rotate-180' : ''}`} />
-                    </button>
-                    
-                    {showPassForm && (
-                      <div className="mt-6 space-y-4 animate-in slide-in-from-top-2 duration-300">
-                        <div className="relative">
-                          <InputGroup 
-                            label="Nova Senha" 
-                            type={showPass ? "text" : "password"} 
-                            value={newPassword} 
-                            onChange={setNewPassword} 
-                            placeholder="Mínimo 6 dígitos"
-                          />
-                          <button onClick={() => setShowPass(!showPass)} className="absolute right-4 bottom-4 text-zinc-400">
-                             {showPass ? <EyeOff size={16}/> : <Eye size={16}/>}
-                          </button>
-                        </div>
-                        <InputGroup 
-                          label="Confirmar Senha" 
-                          type={showPass ? "text" : "password"} 
-                          value={confirmPassword} 
-                          onChange={setConfirmPassword} 
+
+              <div className="bg-zinc-50 dark:bg-zinc-900 rounded-[2.4rem] border border-zinc-100 dark:border-zinc-800 overflow-hidden shadow-sm">
+                <button onClick={() => setActiveView('edit-profile')} className="w-full flex items-center justify-between p-6 hover:bg-zinc-100 dark:hover:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-800 transition-colors">
+                  <div className="flex items-center gap-4"><Settings size={22} className="text-blue-500" /><span className="text-[11px] font-black uppercase text-black dark:text-white tracking-tight">Editar Negócio</span></div>
+                  <ChevronRight size={20} className="text-zinc-300" />
+                </button>
+
+                {/* Seção de Segurança Atualizada - Alteração Direta */}
+                <div className="p-6 border-b border-zinc-100 dark:border-zinc-800">
+                  <button
+                    onClick={() => setShowPassForm(!showPassForm)}
+                    className="w-full flex items-center justify-between transition-all"
+                  >
+                    <div className="flex items-center gap-4"><ShieldCheck size={22} className="text-zinc-400" /><span className="text-[11px] font-black uppercase text-black dark:text-white tracking-tight">Segurança & Senha</span></div>
+                    <ChevronDown size={18} className={`text-zinc-300 transition-transform duration-300 ${showPassForm ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showPassForm && (
+                    <div className="mt-6 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                      <div className="relative">
+                        <InputGroup
+                          label="Nova Senha"
+                          type={showPass ? "text" : "password"}
+                          value={newPassword}
+                          onChange={setNewPassword}
+                          placeholder="Mínimo 6 dígitos"
                         />
-                        <button 
-                          onClick={handleUpdatePassword}
-                          disabled={passLoading || !newPassword}
-                          className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 ${passSuccess ? 'bg-green-600 text-white border-none' : 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/5'}`}
-                        >
-                          {passLoading ? <Loader2 size={16} className="animate-spin"/> : passSuccess ? <Check size={16}/> : <KeyRound size={16}/>}
-                          {passLoading ? 'Atualizando...' : passSuccess ? 'Senha Alterada!' : 'Confirmar Nova Senha'}
+                        <button onClick={() => setShowPass(!showPass)} className="absolute right-4 bottom-4 text-zinc-400">
+                          {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
-                    )}
-                 </div>
+                      <InputGroup
+                        label="Confirmar Senha"
+                        type={showPass ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={setConfirmPassword}
+                      />
+                      <button
+                        onClick={handleUpdatePassword}
+                        disabled={passLoading || !newPassword}
+                        className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 ${passSuccess ? 'bg-green-600 text-white border-none' : 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/5'}`}
+                      >
+                        {passLoading ? <Loader2 size={16} className="animate-spin" /> : passSuccess ? <Check size={16} /> : <KeyRound size={16} />}
+                        {passLoading ? 'Atualizando...' : passSuccess ? 'Senha Alterada!' : 'Confirmar Nova Senha'}
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-                 <div className="p-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4">{theme === 'light' ? <Sun size={22} className="text-orange-500" /> : <Moon size={22} className="text-blue-500" />}<span className="text-[11px] font-black uppercase text-black dark:text-white">Tema Visual</span></div>
-                    <button onClick={() => onToggleTheme(theme === 'light' ? 'dark' : 'light')} className={`w-12 h-7 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-zinc-200'}`}><div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-sm ${theme === 'dark' ? 'left-6' : 'left-1'}`} /></button>
-                 </div>
+                <div className="p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-4">{theme === 'light' ? <Sun size={22} className="text-orange-500" /> : <Moon size={22} className="text-blue-500" />}<span className="text-[11px] font-black uppercase text-black dark:text-white">Tema Visual</span></div>
+                  <button onClick={() => onToggleTheme(theme === 'light' ? 'dark' : 'light')} className={`w-12 h-7 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-blue-600' : 'bg-zinc-200'}`}><div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-sm ${theme === 'dark' ? 'left-6' : 'left-1'}`} /></button>
+                </div>
               </div>
 
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-950 rounded-[2.4rem] border border-zinc-100 dark:border-zinc-900 space-y-5">
+              <div className="p-6 bg-zinc-50 dark:bg-zinc-900 rounded-[2.4rem] border border-zinc-100 dark:border-zinc-800 space-y-5">
                 <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em] ml-2">Visão Rápida</h3>
                 <div className="grid grid-cols-3 gap-3">
-                  <QuickContact icon={<MessageCircle size={18}/>} label="Whats" value={initialBusiness.whatsapp} />
-                  <QuickContact icon={<Phone size={18}/>} label="Fone" value={initialBusiness.phone} />
-                  <QuickContact icon={<Mail size={18}/>} label="Email" value={initialBusiness.email} />
+                  <QuickContact icon={<MessageCircle size={18} />} label="Whats" value={initialBusiness.whatsapp} />
+                  <QuickContact icon={<Phone size={18} />} label="Fone" value={initialBusiness.phone} />
+                  <QuickContact icon={<Mail size={18} />} label="Email" value={initialBusiness.email} />
                 </div>
               </div>
             </div>
@@ -315,12 +317,12 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
       {/* VIEW DE EDIÇÃO */}
       {activeView === 'edit-profile' && (
         <div className="absolute inset-0 bg-white dark:bg-black z-[100] flex flex-col animate-in slide-in-from-bottom duration-400">
-          <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-zinc-900 bg-white dark:bg-black shrink-0 relative z-10">
+          <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-black shrink-0 relative z-10">
             <button onClick={() => setActiveView('main')} className="text-zinc-500 w-11 h-11 rounded-2xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center active:scale-90 transition-all"><X size={22} /></button>
             <h2 className="text-[10px] font-black uppercase tracking-widest text-black dark:text-white text-center flex-1 italic">Setup Profissional</h2>
             <div className="w-11" />
           </div>
-          
+
           <div className="flex-1 overflow-y-auto px-6 py-8 hide-scrollbar pb-32 smooth-scroll">
             <div className="space-y-10">
               <div className="flex flex-col items-center space-y-4">
@@ -331,7 +333,7 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
                   <div className="absolute -bottom-1 -right-1 w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white border-4 border-white dark:border-black shadow-lg"><Camera size={18} /></div>
                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleLogoChange} />
                 </div>
-                
+
                 {error && (
                   <div className="bg-red-50 dark:bg-red-900/10 p-5 rounded-[1.5rem] border border-red-500/20 flex gap-4 items-center animate-in shake duration-300">
                     <AlertCircle className="text-red-500 shrink-0" size={24} />
@@ -342,40 +344,40 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
 
               <form id="profile-form" onSubmit={handleSaveProfile} className="space-y-8">
                 <div className="space-y-5">
-                  <SectionHeader icon={<User size={14}/>} title="Empresa" />
-                  <InputGroup label="Nome Fantasia" value={formData.name} onChange={v => setFormData({...formData, name: v})} placeholder="Ex: Studio Criativo" />
+                  <SectionHeader icon={<User size={14} />} title="Empresa" />
+                  <InputGroup label="Nome Fantasia" value={formData.name} onChange={v => setFormData({ ...formData, name: v })} placeholder="Ex: Studio Criativo" />
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Segmento</label>
-                    <select className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-[14px] font-bold text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as Category})}>
-                        {Object.values(Category).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    <select className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-[14px] font-bold text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value as Category })}>
+                      {Object.values(Category).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                   </div>
                 </div>
 
                 <div className="space-y-5">
-                  <SectionHeader icon={<MessageCircle size={14}/>} title="Contatos" />
+                  <SectionHeader icon={<MessageCircle size={14} />} title="Contatos" />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <InputGroup 
-                      icon={<MessageCircle size={14}/>} 
-                      label="WhatsApp" 
-                      value={formData.whatsapp} 
-                      onChange={v => setFormData({...formData, whatsapp: v})} 
-                      placeholder="Somente Números" 
+                    <InputGroup
+                      icon={<MessageCircle size={14} />}
+                      label="WhatsApp"
+                      value={formData.whatsapp}
+                      onChange={v => setFormData({ ...formData, whatsapp: v })}
+                      placeholder="Somente Números"
                     />
-                    <InputGroup 
-                      icon={<Phone size={14}/>} 
-                      label="Telefone" 
-                      value={formData.phone} 
-                      onChange={v => setFormData({...formData, phone: v})} 
-                      placeholder="Fixo/Celular" 
+                    <InputGroup
+                      icon={<Phone size={14} />}
+                      label="Telefone"
+                      value={formData.phone}
+                      onChange={v => setFormData({ ...formData, phone: v })}
+                      placeholder="Fixo/Celular"
                     />
                   </div>
-                  <InputGroup icon={<Mail size={14}/>} label="E-mail" value={formData.email} onChange={v => setFormData({...formData, email: v})} placeholder="contato@empresa.com" />
-                  <InputGroup icon={<MapPin size={14}/>} label="Endereço/Cidade" value={formData.location} onChange={v => setFormData({...formData, location: v})} placeholder="Sua localização" />
+                  <InputGroup icon={<Mail size={14} />} label="E-mail" value={formData.email} onChange={v => setFormData({ ...formData, email: v })} placeholder="contato@empresa.com" />
+                  <InputGroup icon={<MapPin size={14} />} label="Endereço/Cidade" value={formData.location} onChange={v => setFormData({ ...formData, location: v })} placeholder="Sua localização" />
                 </div>
 
                 <div className="space-y-5">
-                  <SectionHeader icon={<Clock size={14}/>} title="Expediente" />
+                  <SectionHeader icon={<Clock size={14} />} title="Expediente" />
                   <div className="space-y-3">
                     <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Dias de Operação</label>
                     <div className="flex justify-between gap-1.5">
@@ -392,14 +394,14 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
                     </div>
                   </div>
                   <div className="flex gap-4">
-                    <InputGroup label="Abre às" value={formData.openTime} onChange={v => setFormData({...formData, openTime: v})} type="time" />
-                    <InputGroup label="Fecha às" value={formData.closeTime} onChange={v => setFormData({...formData, closeTime: v})} type="time" />
+                    <InputGroup label="Abre às" value={formData.openTime} onChange={v => setFormData({ ...formData, openTime: v })} type="time" />
+                    <InputGroup label="Fecha às" value={formData.closeTime} onChange={v => setFormData({ ...formData, closeTime: v })} type="time" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Bio / Slogan</label>
-                  <textarea className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-5 text-[14px] font-medium border border-zinc-100 dark:border-zinc-800 text-black dark:text-white h-32 resize-none outline-none focus:ring-1 focus:ring-blue-500" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} />
+                  <textarea className="w-full bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-5 text-[14px] font-medium border border-zinc-100 dark:border-zinc-800 text-black dark:text-white h-32 resize-none outline-none focus:ring-1 focus:ring-blue-500" value={formData.bio} onChange={e => setFormData({ ...formData, bio: e.target.value })} />
                 </div>
               </form>
             </div>
@@ -407,13 +409,13 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, onU
 
           {/* Botão Flutuante Glass Pill */}
           <div className="absolute bottom-10 left-8 right-8 z-[110] pointer-events-none">
-            <button 
+            <button
               form="profile-form"
-              type="submit" 
-              disabled={isSaving || isUploading} 
+              type="submit"
+              disabled={isSaving || isUploading}
               className={`w-full h-15 rounded-full font-black text-[11px] uppercase tracking-[0.2em] transition-all shadow-2xl active:scale-95 flex items-center justify-center gap-3 pointer-events-auto border border-white/20 backdrop-blur-xl ${saveSuccess ? 'bg-green-600/90 text-white' : 'bg-blue-600/90 text-white'}`}
             >
-              {isSaving ? <Loader2 className="animate-spin" size={16}/> : saveSuccess ? <Check size={16}/> : null}
+              {isSaving ? <Loader2 className="animate-spin" size={16} /> : saveSuccess ? <Check size={16} /> : null}
               {isSaving ? 'Salvando...' : saveSuccess ? 'Confirmado!' : 'Salvar Perfil'}
             </button>
           </div>
@@ -443,12 +445,12 @@ const InputGroup: React.FC<{ label: string; value: string; onChange: (v: string)
       {icon && <div className="text-zinc-400">{icon}</div>}
       <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{label}</label>
     </div>
-    <input 
-      type={type} 
+    <input
+      type={type}
       placeholder={placeholder}
-      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-[14px] font-bold text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-700" 
-      value={value} 
-      onChange={e => onChange(e.target.value)} 
+      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 text-[14px] font-bold text-black dark:text-white outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-700"
+      value={value}
+      onChange={e => onChange(e.target.value)}
     />
   </div>
 );

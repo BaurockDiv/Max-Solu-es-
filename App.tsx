@@ -160,7 +160,7 @@ const App: React.FC = () => {
   if (loading) return <div className="h-[100dvh] flex items-center justify-center bg-black text-blue-500 font-black tracking-[0.5em] animate-pulse">MAX COMPANY</div>;
 
   return (
-    <div className={`mobile-frame animate-gpu ${theme === 'dark' ? 'dark bg-black text-white' : 'bg-white text-zinc-950'}`}>
+    <div className={`mobile-frame animate-gpu dark:bg-black bg-white transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}>
       <main className="flex-1 overflow-hidden relative z-0 flex flex-col">
         {renderContent()}
       </main>
