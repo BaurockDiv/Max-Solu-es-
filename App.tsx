@@ -162,7 +162,7 @@ const App: React.FC = () => {
       case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} />;
       case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
       case 'me': return <MeView session={session} business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} onUpdateBusiness={handleUpdateBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} onPreviewProfile={(id) => openProfile(id, 'me')} />;
-      case 'record': return <RecordView onCancel={() => setActiveTab('feed')} onPost={handleNewPost} />;
+      case 'record': return <div className="flex-1 bg-black" />;
       default: return null;
     }
   };
@@ -208,6 +208,15 @@ const App: React.FC = () => {
             <NavButton active={activeTab === 'me'} icon={session ? <User size={22} /> : <LogIn size={22} />} label="Perfil" onClick={() => setActiveTab('me')} theme={theme} />
           </div>
         </nav>
+      )}
+      {activeTab === 'record' && (
+        <RecordView
+          onCancel={() => {
+            setActiveTab(lastTab);
+            setLastTab('feed');
+          }}
+          onPost={handleNewPost}
+        />
       )}
     </div>
   );
