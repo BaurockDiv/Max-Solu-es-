@@ -20,6 +20,28 @@ export enum Category {
   FITNESS = 'Esportes & Fitness'
 }
 
+export interface Conversation {
+  id: string;
+  participant_1: string;
+  participant_2: string;
+  status: 'pending' | 'accepted' | 'declined';
+  last_message?: string;
+  updated_at: string;
+  other_participant?: {
+    name: string;
+    logo?: string;
+  };
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  type: 'text' | 'image' | 'audio';
+  created_at: string;
+}
+
 export interface Business {
   id: string;
   name: string;

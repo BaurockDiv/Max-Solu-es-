@@ -40,6 +40,7 @@ interface MeViewProps {
   theme: 'light' | 'dark';
   onToggleTheme: (theme: 'light' | 'dark') => void;
   onOpenDashboard: () => void;
+  onOpenChat: () => void;
   onPreviewProfile?: (id: string) => void;
 }
 
@@ -53,7 +54,7 @@ const DAYS_OF_WEEK = [
   { id: 'Sab', label: 'S' },
 ];
 
-const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, userPosts, onUpdateBusiness, theme, onToggleTheme, onOpenDashboard, onPreviewProfile }) => {
+const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, userPosts, onUpdateBusiness, theme, onToggleTheme, onOpenDashboard, onOpenChat, onPreviewProfile }) => {
   const [activeView, setActiveView] = useState<'main' | 'edit-profile' | 'manage-posts' | 'edit-post'>('main');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingPost, setEditingPost] = useState<MediaPost | null>(null);
@@ -473,109 +474,29 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
                         disabled={passLoading || !newPassword}
                         className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 ${passSuccess ? 'bg-green-600 text-white border-none' : 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/5'}`}
                       >
-                        {passLoading ? <Loader2 size={16} className="animate-spin" /> : passSuccess ? <Check size={16} /> : <KeyRound size={16} />}
                         {passLoading ? 'Atualizando...' : passSuccess ? 'Senha Alterada!' : 'Confirmar Nova Senha'}
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Seeder de Estresse - 30 Contas (Blindado) */}
-                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-blue-600/5 space-y-3">
+                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
                   <button
-                    id="seed-btn"
-                    onClick={async (e) => {
-                      if (!window.confirm("Gerar 30 contas de teste agora?")) return;
-                      const target = e.currentTarget;
-                      target.disabled = true;
-                      target.innerText = "PREPARANDO...";
-
-                      const categories = ['Estética', 'TI', 'Saúde', 'Gastronomia', 'Construção', 'Pet Shop', 'Moda'];
-                      const bases = ["Studio", "Master", "Prime", "Elite", "Global", "Nexus", "Alpha", "Star", "Mega", "Delta"];
-
-                      try {
-                        for (let i = 0; i < 30; i++) {
-                          const cat = categories[i % categories.length];
-                          const name = `[TESTE] ${bases[i % bases.length]} ${i + 1}`;
-
-                          target.innerText = `CRIANDO (${i + 1}/30)...`;
-
-                          // Tenta inserir a empresa
-                          const { data: bData, error: bErr } = await supabase.from('businesses').insert({
-                            name,
-                            category: cat,
-                            description: `Perfil profissional de teste para estresse do feed. Categoria: ${cat}.`,
-                            logo: `https://picsum.photos/seed/stress_${i}/200`,
-                            owner_id: session?.user?.id || crypto.randomUUID(), // Prioriza seu ID para rodar com RLS ativo
-                            whatsapp: "(11) 99999-9999"
-                          }).select(); // Removido .single() para evitar falhas de select-policy
-
-                          if (bErr) throw new Error(`Erro na Empresa ${i}: ${bErr.message}`);
-
-                          if (bData && bData[0]) {
-                            const bizId = bData[0].id;
-                            const { error: pErr } = await supabase.from('posts').insert([
-                              {
-                                business_id: bizId,
-                                media_url: `https://picsum.photos/seed/tp1${bizId}/800/1000`,
-                                type: 'image',
-                                caption: `Resultado do dia! Especialidade em ${cat}. #teste #stress`,
-                                likes: Math.floor(Math.random() * 500)
-                              },
-                              {
-                                business_id: bizId,
-                                media_url: `https://picsum.photos/seed/tp2${bizId}/800/1000`,
-                                type: 'image',
-                                caption: `Qualidade Máxima com ${name}. Venha conferir! #test #app`,
-                                likes: Math.floor(Math.random() * 150)
-                              }
-                            ]);
-                            if (pErr) console.warn("Erro ao inserir posts:", pErr.message);
-                          }
-                        }
-                        alert("Sucesso! 30 profissionais e 60 publicações criadas.");
-                        window.location.reload();
-                      } catch (err: any) {
-                        console.error(err);
-                        alert(`FALHA NA GERAÇÃO:\n${err.message}\n\nVerifique se o SQL foi rodado corretamente.`);
-                      } finally {
-                        target.disabled = false;
-                        target.innerText = "🚀 GERAR 30 CONTAS DE TESTE";
-                      }
-                    }}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg"
+                    onClick={onOpenChat}
+                    className="w-full flex items-center justify-between p-6 bg-blue-600 text-white rounded-[2.4rem] shadow-xl shadow-blue-500/10 active:scale-[0.98] transition-all group"
                   >
-                    🚀 Gerar 30 Contas de Teste
+                    <div className="flex items-center gap-4">
+                      <MessageCircle size={22} />
+                      <span className="text-[11px] font-black uppercase tracking-widest">Suas Mensagens</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                      <ChevronRight size={18} />
+                    </div>
                   </button>
-
-                  <button
-                    onClick={async (e) => {
-                      if (!window.confirm("Apagar todas as contas de teste?")) return;
-                      const target = e.currentTarget;
-                      target.disabled = true;
-                      target.innerText = "LIMPANDO BANCO...";
-                      try {
-                        const { data: testBiz } = await supabase.from('businesses').select('id').ilike('name', '[TESTE]%');
-                        if (testBiz && testBiz.length > 0) {
-                          const ids = testBiz.map(b => b.id);
-                          await supabase.from('posts').delete().in('business_id', ids);
-                          await supabase.from('businesses').delete().in('id', ids);
-                          alert("Dados limpos com sucesso.");
-                          window.location.reload();
-                        } else {
-                          alert("Nada para limpar.");
-                        }
-                      } catch (err: any) {
-                        alert("Erro ao apagar: " + err.message);
-                      } finally {
-                        target.disabled = false;
-                        target.innerText = "🗑️ LIMPAR DADOS DE TESTE";
-                      }
-                    }}
-                    className="w-full py-3 bg-red-600/10 text-red-600 rounded-xl text-[8px] font-black uppercase tracking-widest active:scale-95 transition-all"
-                  >
-                    🗑️ Limpar Dados de Teste
-                  </button>
+                  <p className="mt-4 text-[8px] text-zinc-500 font-bold text-center uppercase tracking-widest leading-relaxed">
+                    Gerencie solicitações e conversas com clientes e profissionais.
+                  </p>
                 </div>
 
                 <div className="p-6 flex items-center justify-between">

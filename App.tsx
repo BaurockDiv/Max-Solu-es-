@@ -11,6 +11,7 @@ import MeView from './components/MeView';
 import RecordView from './components/RecordView';
 import AuthView from './components/AuthView';
 import FollowingView from './components/FollowingView';
+import ChatView from './components/ChatView';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -160,18 +161,18 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (!session && ['me', 'following', 'dashboard'].includes(activeTab)) {
+    const requireAuth = ['record', 'dashboard', 'me', 'chat'];
+    if (requireAuth.includes(activeTab) && !session) {
       return <AuthView onBack={() => setActiveTab('feed')} />;
     }
     switch (activeTab) {
-      case 'feed': return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} onRefresh={fetchData} userId={session?.user.id} />;
-      case 'discovery': return <DiscoveryView onBusinessClick={(id) => openProfile(id, 'discovery')} />;
       case 'following': return <FollowingView onProfileClick={(id) => openProfile(id, 'following')} userId={session?.user.id} />;
-      case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} />;
+      case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} onStartChat={() => setActiveTab('chat')} />;
       case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
-      case 'me': return <MeView session={session} business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} onUpdateBusiness={handleUpdateBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} onPreviewProfile={(id) => openProfile(id, 'me')} />;
+      case 'me': return <MeView session={session} business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} onUpdateBusiness={handleUpdateBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} onPreviewProfile={(id) => openProfile(id, 'me')} onOpenChat={() => setActiveTab('chat')} />;
+      case 'chat': return <ChatView session={session} onBack={() => setActiveTab('me')} />;
       case 'record': return <RecordView onCancel={() => { setActiveTab(lastTab); setLastTab('feed'); }} onPost={handleNewPost} />;
-      default: return null;
+      default: return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} onRefresh={fetchData} userId={session?.user.id} />;
     }
   };
 

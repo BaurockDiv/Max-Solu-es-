@@ -24,9 +24,10 @@ interface ProfileViewProps {
   posts: MediaPost[];
   onBack: () => void;
   session?: any;
+  onStartChat: () => void;
 }
 
-const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, session }) => {
+const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, session, onStartChat }) => {
   const [following, setFollowing] = useState(supabase.helpers.isFollowing(business.id));
   const [activeTab, setActiveTab] = useState<'posts' | 'info'>('posts');
   const [selectedPost, setSelectedPost] = useState<MediaPost | null>(null);
@@ -35,6 +36,41 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, sess
     const userId = session?.user?.id;
     const newFollows = await supabase.helpers.toggleFollow(business.id, userId);
     setFollowing(newFollows.includes(business.id));
+  };
+
+  const handleStartChat = async () => {
+    if (!session) {
+      alert("Faça login para enviar mensagens.");
+      return;
+    }
+
+    if (session.user.id === business.owner_id) {
+      alert("Você não pode iniciar um chat consigo mesmo.");
+      return;
+    }
+
+    try {
+      // Verifica se conversa já existe
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(`and(participant_1.eq.${session.user.id},participant_2.eq.${business.owner_id}),and(participant_1.eq.${business.owner_id},participant_2.eq.${session.user.id})`)
+        .single();
+
+      if (!existing) {
+        // Cria nova solicitação de conversa
+        await supabase.from('conversations').insert({
+          participant_1: session.user.id,
+          participant_2: business.owner_id,
+          status: 'pending'
+        });
+      }
+
+      onStartChat();
+    } catch (err) {
+      console.error("Chat error:", err);
+      onStartChat(); // Tenta abrir mesmo assim
+    }
   };
 
   const handleContact = (type: 'whatsapp' | 'email' | 'phone') => {
@@ -85,6 +121,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, sess
             <div className="absolute bottom-0 right-0 bg-green-500 w-5 h-5 rounded-full border-[3px] border-white dark:border-black shadow-lg" />
           </div>
           <div className="flex space-x-2 mb-2">
+            <button
+              onClick={handleStartChat}
+              className="px-4 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-white border border-zinc-200 dark:border-zinc-800 flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+            >
+              <MessageCircle size={14} />
+              <span className="text-[9px] font-black uppercase tracking-widest">Mensagem</span>
+            </button>
             <button onClick={handleFollow} className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all transform active:scale-95 shadow-md flex items-center justify-center ${following ? 'bg-zinc-200 dark:bg-zinc-900 text-black dark:text-zinc-400 border border-zinc-300 dark:border-none' : 'bg-blue-600 text-white shadow-blue-500/10'}`}>{following ? 'Seguindo' : 'Seguir'}</button>
           </div>
         </div>
