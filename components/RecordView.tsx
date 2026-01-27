@@ -23,9 +23,9 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [quality, setQuality] = useState<'ultra' | 'high' | 'balanced'>('balanced'); // Default to Balanced (720p)
 
   const qualityConfig = {
-    ultra: { width: 3840, height: 2160, bitrate: 50000000 }, // 50Mbps
-    high: { width: 1920, height: 1080, bitrate: 25000000 },  // 25Mbps
-    balanced: { width: 1280, height: 720, bitrate: 10000000 } // 10Mbps
+    ultra: { width: 3840, height: 2160, bitrate: 8000000 },
+    high: { width: 1920, height: 1080, bitrate: 4000000 },
+    balanced: { width: 1280, height: 720, bitrate: 2000000 }
   };
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -87,44 +87,42 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     stopCamera();
     const config = qualityConfig[quality];
     try {
-      // Tenta inicializar com as configurações de qualidade escolhidas
+      const constraints = {
+        video: {
+          aspectRatio: { ideal: 9 / 16 },
+          width: { ideal: config.width },
+          height: { ideal: config.height },
+          facingMode: { ideal: facingMode },
+          frameRate: { ideal: 60, min: 30 } // Tenta forçar 60fps, aceita 30
+        },
+        // AUDIO PRO: Desativa filtros que destroem a qualidade em gravações
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+          sampleRate: 48000
+        }
+      };
+
       let stream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: facingMode },
-            width: { ideal: config.width },
-            height: { ideal: config.height },
-            frameRate: { ideal: 30 }
-          },
-          audio: { echoCancellation: true, noiseSuppression: true }
-        });
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (err) {
-        console.warn("Falha na qualidade ideal, tentando modo básico...");
-        // Fallback para o modo mais simples possível
+        console.warn("Retrying camera with simple fallback...");
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: facingMode } },
           audio: true
         });
       }
 
-      if (stream) {
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          // Forçar play() explicitamente para evitar tela preta em alguns sistemas
-          try {
-            await videoRef.current.play();
-          } catch (playErr) {
-            console.warn("Auto-play blocked, waiting for interaction or metadata.");
-          }
-        }
-        setError(null);
-        setFlashLevel(0);
-      }
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setError(null);
+      setFlashLevel(0);
     } catch (e: any) {
-      console.error("Camera Error total failure:", e);
-      setError("Não foi possível acessar sua câmera. Verifique se o navegador tem permissão.");
+      console.error("Camera Error:", e);
+      setError("Permissão de câmera negada ou dispositivo indisponível.");
     }
   };
 
