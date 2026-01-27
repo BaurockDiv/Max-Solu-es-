@@ -18,6 +18,13 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const [uploadStatus, setUploadStatus] = useState<{ progress: number, stage: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flashLevel, setFlashLevel] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [quality, setQuality] = useState<'high' | 'balanced'>('balanced'); // Default to Balanced (720p)
+
+  const qualityConfig = {
+    high: { width: 1920, height: 1080, bitrate: 2500000 },
+    balanced: { width: 1280, height: 720, bitrate: 1500000 }
+  };
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -34,7 +41,7 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
       stopCamera();
     }
     return () => stopCamera();
-  }, [facingMode, step]);
+  }, [facingMode, step, quality]);
 
   const toggleFlash = async () => {
     if (!streamRef.current) return;
@@ -56,12 +63,13 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
 
   const startCamera = async () => {
     stopCamera();
+    const config = qualityConfig[quality];
     try {
       const constraints = {
         video: {
           aspectRatio: { ideal: 9 / 16 },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          width: { ideal: config.width },
+          height: { ideal: config.height },
           facingMode: { ideal: facingMode },
           frameRate: { ideal: 30 }
         },
@@ -99,23 +107,35 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
   const startRecording = () => {
     if (!streamRef.current) return;
     chunksRef.current = [];
+
+    // Deixar o navegador escolher o melhor codec nativo
+    let mimeType = 'video/webm';
+    if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
+    else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) mimeType = 'video/webm;codecs=vp9';
+
     const options = {
-      mimeType: MediaRecorder.isTypeSupported('video/mp4;codecs=h264') ? 'video/mp4;codecs=h264' : 'video/webm;codecs=vp9',
-      videoBitsPerSecond: 2500000 // 2.5 Mbps: Sweet spot para 1080p mobile sem travar a CPU
+      mimeType,
+      videoBitsPerSecond: qualityConfig[quality].bitrate
     };
-    const recorder = new MediaRecorder(streamRef.current, options);
-    mediaRecorderRef.current = recorder;
-    recorder.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: options.mimeType });
-      setMediaBlob(blob);
-      setPreviewUrl(URL.createObjectURL(blob));
-      setStep('edit');
-    };
-    recorder.start();
-    setIsRecording(true);
-    setDuration(0);
-    timerRef.current = window.setInterval(() => setDuration(d => d + 1), 1000);
+
+    try {
+      const recorder = new MediaRecorder(streamRef.current, options);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        setMediaBlob(blob);
+        setPreviewUrl(URL.createObjectURL(blob));
+        setStep('edit');
+      };
+      recorder.start(1000); // Salva chunks a cada 1s para evitar perda de dados
+      setIsRecording(true);
+      setDuration(0);
+      timerRef.current = window.setInterval(() => setDuration(d => d + 1), 1000);
+    } catch (err) {
+      console.error(err);
+      setError("Erro ao iniciar gravação. Tente reduzir a qualidade.");
+    }
   };
 
   const stopRecording = () => {
@@ -158,6 +178,32 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         }
       }} />
 
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
+          <div className="bg-zinc-900 w-full max-w-xs rounded-3xl p-6 border border-white/10 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-black uppercase tracking-wider">Configurações</h3>
+              <button onClick={() => setShowSettings(false)}><X className="text-zinc-500" /></button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest pl-2">Qualidade de Vídeo</p>
+              <div className="flex flex-col gap-2">
+                <button onClick={() => { setQuality('high'); setShowSettings(false); }} className={`p-4 rounded-xl text-left border transition-all ${quality === 'high' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-black/20 border-white/5 text-zinc-400'}`}>
+                  <span className="block font-bold text-sm">Alta (1080p)</span>
+                  <span className="text-[10px] opacity-60">Melhor qualidade, arquivo maior.</span>
+                </button>
+                <button onClick={() => { setQuality('balanced'); setShowSettings(false); }} className={`p-4 rounded-xl text-left border transition-all ${quality === 'balanced' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-black/20 border-white/5 text-zinc-400'}`}>
+                  <span className="block font-bold text-sm">Suave (720p)</span>
+                  <span className="text-[10px] opacity-60">Ideal para evitar travamentos.</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Fixo - Safe Area */}
       <div className="absolute top-0 left-0 right-0 p-4 pt-[calc(env(safe-area-inset-top)+1rem)] flex items-center justify-between z-50 pointer-events-none">
         <button onClick={onCancel} className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10 pointer-events-auto active:scale-90 transition-all shadow-lg"><X size={20} /></button>
@@ -171,11 +217,11 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
 
         <div className="flex gap-3 pointer-events-auto">
           {facingMode === 'environment' && (
-            <button onClick={toggleFlash} className={`w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10 transition-all ${flashLevel > 0 ? 'bg-yellow-400 text-black' : 'bg-black/40 text-white'}`}>
+            <button onClick={toggleFlash} className={`w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10 transition-all ${flashLevel > 0 ? 'bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'bg-black/40 text-white'}`}>
               {flashLevel > 0 ? <Zap size={20} className="fill-current" /> : <ZapOff size={20} />}
             </button>
           )}
-          <button className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10"><Settings size={20} /></button>
+          <button onClick={() => setShowSettings(true)} className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all"><Settings size={20} /></button>
         </div>
       </div>
 
