@@ -167,6 +167,8 @@ const App: React.FC = () => {
       return <AuthView onBack={() => setActiveTab('feed')} />;
     }
     switch (activeTab) {
+      case 'feed': return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} onRefresh={fetchData} userId={session?.user.id} />;
+      case 'discovery': return <DiscoveryView onBusinessClick={(id) => openProfile(id, 'discovery')} />;
       case 'following': return <FollowingView onProfileClick={(id) => openProfile(id, 'following')} userId={session?.user.id} />;
       case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} onStartChat={(bizId) => { setActiveChatBizId(bizId); setActiveTab('chat'); }} />;
       case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
