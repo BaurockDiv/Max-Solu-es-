@@ -230,9 +230,9 @@ const App: React.FC = () => {
             active={activeTab === 'feed'}
             icon={<Home size={22} />}
             label="Início"
-            onClick={async () => {
+            onClick={() => {
               if (activeTab === 'feed') {
-                fetchData();
+                window.location.reload();
               } else {
                 setActiveTab('feed');
               }
