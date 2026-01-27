@@ -93,17 +93,23 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
           width: { ideal: config.width },
           height: { ideal: config.height },
           facingMode: { ideal: facingMode },
-          frameRate: { ideal: 30 }
+          frameRate: { ideal: 60, min: 30 } // Tenta forçar 60fps, aceita 30
         },
-        audio: { echoCancellation: true, noiseSuppression: true }
+        // AUDIO PRO: Desativa filtros que destroem a qualidade em gravações
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+          sampleRate: 48000
+        }
       };
 
       let stream;
       try {
         stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (err) {
-        // Fallback: se 4K/60fps falhar, tenta padrão
-        console.warn("Retrying camera with lower constraints...");
+        console.warn("Retrying camera with simple fallback...");
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: facingMode } },
           audio: true
@@ -113,9 +119,10 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
       setError(null);
+      setFlashLevel(0);
     } catch (e: any) {
       console.error("Camera Error:", e);
-      setError("Não foi possível acessar a câmera. Verifique as permissões.");
+      setError("Permissão de câmera negada ou dispositivo indisponível.");
     }
   };
 
@@ -130,15 +137,16 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     if (!streamRef.current) return;
     chunksRef.current = [];
 
-    // Deixar o navegador escolher o melhor codec nativo
+    // Tenta forçar MP4 (H.264) primeiro pois geralmente é acelerado por hardware (mais fluido)
     let mimeType = 'video/webm';
     if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
+    else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) mimeType = 'video/webm;codecs=h264';
     else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) mimeType = 'video/webm;codecs=vp9';
 
     const options = {
       mimeType,
       videoBitsPerSecond: qualityConfig[quality].bitrate,
-      audioBitsPerSecond: 128000 // 128kbps para áudio cristalino
+      audioBitsPerSecond: 192000 // Aumenta para 192kbps (qualidade quase CD)
     };
 
     try {
@@ -151,7 +159,8 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         setPreviewUrl(URL.createObjectURL(blob));
         setStep('edit');
       };
-      recorder.start(1000); // Salva chunks a cada 1s para evitar perda de dados
+      // REMOVIDO TIMESLICE (1000) -> Isso remove a "travadinha" a cada segundo
+      recorder.start();
       setIsRecording(true);
       setDuration(0);
       timerRef.current = window.setInterval(() => setDuration(d => d + 1), 1000);
