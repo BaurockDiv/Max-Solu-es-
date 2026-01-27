@@ -84,12 +84,15 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
     }
   };
 
+  const isStartingRef = useRef(false);
+
   const startCamera = async () => {
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
     setIsInitializing(true);
     stopCamera();
 
-    // Pequeno delay para garantir que o React renderizou o elemento video
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     try {
       const constraintsList = [
@@ -103,8 +106,8 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
         try {
           stream = await navigator.mediaDevices.getUserMedia(constraints);
           if (stream) break;
-        } catch (e) {
-          console.warn("Constraint failed:", e);
+        } catch (e: any) {
+          console.warn("Constraint failed:", constraints, e.name);
         }
       }
 
@@ -119,14 +122,19 @@ const RecordView: React.FC<RecordViewProps> = ({ onCancel, onPost }) => {
 
         await videoRef.current.play();
         setError(null);
-      } else if (!stream) {
-        throw new Error("Não foi possível acessar nenhuma câmera.");
+      } else {
+        throw new Error("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
       }
     } catch (e: any) {
-      console.error("Critical:", e);
-      setError("Erro ao abrir câmera: " + (e.message || "Erro desconhecido"));
+      console.error("Camera Error:", e);
+      if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+        setError("Acesso à câmera negado. Por favor, permita o acesso nas configurações do seu navegador.");
+      } else {
+        setError("Erro ao abrir câmera: " + (e.message || "Erro desconhecido"));
+      }
     } finally {
       setIsInitializing(false);
+      isStartingRef.current = false;
     }
   };
 
