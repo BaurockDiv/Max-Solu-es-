@@ -223,8 +223,8 @@ const App: React.FC = () => {
         <div className="flex justify-center items-center w-full">
           <NavButton active={activeTab === 'discovery'} icon={<Search size={22} />} label="Busca" onClick={() => setActiveTab('discovery')} theme={theme} />
         </div>
-        <div className="flex justify-center items-center w-full h-14 relative">
-          <div onClick={() => setActiveTab('record')} className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all cursor-pointer absolute -top-5"><PlusSquare size={24} /></div>
+        <div className="flex justify-center items-center w-full">
+          <div onClick={() => setActiveTab('record')} className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all cursor-pointer mt-1"><PlusSquare size={24} /></div>
         </div>
         <div className="flex justify-center items-center w-full">
           <NavButton active={activeTab === 'following'} icon={<Users size={22} />} label="Seguindo" onClick={() => setActiveTab('following')} theme={theme} />
