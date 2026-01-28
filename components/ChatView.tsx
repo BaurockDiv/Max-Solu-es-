@@ -118,31 +118,50 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
             // LOGICA DE SINCRO: Tenta encontrar a conversa com o alvo
             if (initialBizId) {
+                // 1. TENTA ACHAR NA LISTA DE CONVERSAS EXISTENTES
                 const target = formatted.find(c =>
-                    c.participant_1 === initialBizId ||
-                    c.participant_2 === initialBizId ||
+                    (c.participant_1 === initialBizId && c.participant_2 === session.user.id) ||
+                    (c.participant_2 === initialBizId && c.participant_1 === session.user.id) ||
                     (c.other_participant as any)?.owner_id === initialBizId
                 );
 
                 if (target) {
+                    console.log("Conversa encontrada na lista local:", target.id);
                     setActiveConv(target);
                     setGhostChat(null);
                 } else {
-                    // Não achou na lista? Força busca do perfil para o Ghost Chat
-                    const { data: biz } = await supabase
-                        .from('businesses')
-                        .select('name, logo, owner_id, id')
-                        .or(`owner_id.eq.${initialBizId},id.eq.${initialBizId}`)
+                    // 2. SE NÃO ACHOU LOCAL, TENTA BUSCAR DIRETO NO BANCO (Sincronização forçada)
+                    console.log("Buscando conversa no banco para alvo:", initialBizId);
+                    const { data: dbConv } = await supabase
+                        .from('conversations')
+                        .select('*, p1:businesses!conversations_participant_1_fkey(name, logo, owner_id), p2:businesses!conversations_participant_2_fkey(name, logo, owner_id)')
+                        .or(`and(participant_1.eq.${session.user.id},participant_2.eq.${initialBizId}),and(participant_2.eq.${session.user.id},participant_1.eq.${initialBizId})`)
                         .maybeSingle();
 
-                    if (biz) {
-                        setGhostChat({
-                            id: 'ghost',
-                            other_participant: biz,
-                            participant_1: session.user.id,
-                            participant_2: biz.owner_id,
-                            status: 'pending'
-                        });
+                    if (dbConv) {
+                        console.log("Conversa encontrada no banco direto:", dbConv.id);
+                        const isP1 = dbConv.participant_1 === session.user.id;
+                        const other = isP1 ? dbConv.p2 : dbConv.p1;
+                        setActiveConv({ ...dbConv, other_participant: other } as any);
+                        setGhostChat(null);
+                    } else {
+                        // 3. REALMENTE NÃO EXISTE - GHOST CHAT
+                        console.log("Nenhuma conversa encontrada. Preparando Ghost Chat...");
+                        const { data: biz } = await supabase
+                            .from('businesses')
+                            .select('name, logo, owner_id, id')
+                            .or(`owner_id.eq.${initialBizId},id.eq.${initialBizId}`)
+                            .maybeSingle();
+
+                        if (biz) {
+                            setGhostChat({
+                                id: 'ghost',
+                                other_participant: biz,
+                                participant_1: session.user.id,
+                                participant_2: biz.owner_id,
+                                status: 'pending'
+                            });
+                        }
                     }
                 }
             }
@@ -174,23 +193,38 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             let convId = currentConv.id;
 
             if (convId === 'ghost') {
-                console.log("Criando nova conversa...");
-                const { data: newConv, error: cErr } = await supabase.from('conversations').insert({
-                    participant_1: session.user.id,
-                    participant_2: currentConv.participant_2,
-                    status: 'pending',
-                    last_message: type === 'text' ? content : `Arquivo de ${type}`
-                }).select().single();
+                console.log("Verificando existencia final antes de inserir...");
+                // Double check final para evitar unique constraint violation
+                const { data: lastCheck } = await supabase
+                    .from('conversations')
+                    .select('id')
+                    .or(`and(participant_1.eq.${session.user.id},participant_2.eq.${currentConv.participant_2}),and(participant_2.eq.${session.user.id},participant_1.eq.${currentConv.participant_2})`)
+                    .maybeSingle();
 
-                if (cErr) {
-                    console.error("Erro ao criar conversa:", cErr);
-                    alert("Não foi possível iniciar a conversa: " + cErr.message);
-                    return;
+                if (lastCheck) {
+                    console.log("Conversa já existia por garantia, cancelando insert e usando a existente:", lastCheck.id);
+                    convId = lastCheck.id;
+                    // Atualiza a UI para a conversa real
+                    await loadConversations();
+                } else {
+                    console.log("Inserindo nova conversa no banco...");
+                    const { data: newConv, error: cErr } = await supabase.from('conversations').insert({
+                        participant_1: session.user.id,
+                        participant_2: currentConv.participant_2,
+                        status: 'pending',
+                        last_message: type === 'text' ? content : `Arquivo de ${type}`
+                    }).select().single();
+
+                    if (cErr) {
+                        console.error("Erro ao criar conversa:", cErr);
+                        alert("Não foi possível iniciar a conversa: " + cErr.message);
+                        return;
+                    }
+
+                    convId = newConv.id;
+                    setActiveConv({ ...newConv, other_participant: currentConv.other_participant });
+                    setGhostChat(null);
                 }
-
-                convId = newConv.id;
-                setActiveConv({ ...newConv, other_participant: currentConv.other_participant });
-                setGhostChat(null);
             }
 
             console.log("Enviando mensagem para conv:", convId);
