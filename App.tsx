@@ -69,28 +69,34 @@ const App: React.FC = () => {
       try {
         const { data: convs } = await supabase
           .from('conversations')
-          .select('id, participant_1, participant_2')
+          .select('id')
           .or(`participant_1.eq.${session.user.id},participant_2.eq.${session.user.id}`);
 
         if (!convs) return;
 
-        let total = 0;
+        let hasUnread = false;
         for (const conv of convs) {
+          const lastReadTime = localStorage.getItem(`chat_lastRead_${conv.id}`);
+
           const { data: msgs } = await supabase
             .from('messages')
-            .select('id, sender_id, created_at')
+            .select('created_at, sender_id')
             .eq('conversation_id', conv.id)
             .neq('sender_id', session.user.id)
             .order('created_at', { ascending: false })
-            .limit(10);
+            .limit(1);
 
           if (msgs && msgs.length > 0) {
-            const lastRead = localStorage.getItem(`lastRead_${conv.id}`);
-            const unreadInConv = lastRead ? msgs.filter(m => new Date(m.created_at) > new Date(lastRead)).length : msgs.length;
-            total += unreadInConv;
+            const lastMsgTime = new Date(msgs[0].created_at).getTime();
+            const lastRead = lastReadTime ? new Date(lastReadTime).getTime() : 0;
+
+            if (lastMsgTime > lastRead) {
+              hasUnread = true;
+              break;
+            }
           }
         }
-        setTotalUnreadMessages(total);
+        setTotalUnreadMessages(hasUnread ? 1 : 0);
       } catch (err) {
         console.error('[UNREAD] Erro ao verificar:', err);
       }
@@ -302,9 +308,7 @@ const App: React.FC = () => {
         <div className="flex justify-center items-center w-full relative">
           <NavButton active={activeTab === 'me'} icon={session ? <User size={22} /> : <LogIn size={22} />} label="Perfil" onClick={() => setActiveTab('me')} theme={theme} />
           {session && totalUnreadMessages > 0 && (
-            <div className="absolute top-1 right-3 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg shadow-red-500/50">
-              <span className="text-[9px] font-black text-white">{totalUnreadMessages > 9 ? '9+' : totalUnreadMessages}</span>
-            </div>
+            <div className="absolute top-1 right-3 w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
           )}
         </div>
       </nav>

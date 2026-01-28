@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Send,
     ArrowLeft,
-    CheckCheck,
     MessageSquare,
     Loader2,
     User,
@@ -24,7 +23,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     const [activeConvId, setActiveConvId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [recipient, setRecipient] = useState<any>(null);
-    const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+    const [unreadConvIds, setUnreadConvIds] = useState<Set<string>>(new Set());
 
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
@@ -41,6 +40,55 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({ behavior });
         }, 100);
+    };
+
+    const checkUnreadConversations = async () => {
+        if (!session?.user?.id) return;
+
+        try {
+            const { data: convs } = await supabase
+                .from('conversations')
+                .select('id')
+                .or(`participant_1.eq.${session.user.id},participant_2.eq.${session.user.id}`);
+
+            if (!convs) return;
+
+            const unreadSet = new Set<string>();
+
+            for (const conv of convs) {
+                const lastReadTime = localStorage.getItem(`chat_lastRead_${conv.id}`);
+
+                const { data: msgs } = await supabase
+                    .from('messages')
+                    .select('created_at, sender_id')
+                    .eq('conversation_id', conv.id)
+                    .neq('sender_id', session.user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (msgs && msgs.length > 0) {
+                    const lastMsgTime = new Date(msgs[0].created_at).getTime();
+                    const lastRead = lastReadTime ? new Date(lastReadTime).getTime() : 0;
+
+                    if (lastMsgTime > lastRead) {
+                        unreadSet.add(conv.id);
+                    }
+                }
+            }
+
+            setUnreadConvIds(unreadSet);
+        } catch (err) {
+            console.error('[UNREAD] Erro:', err);
+        }
+    };
+
+    const markAsRead = (convId: string) => {
+        localStorage.setItem(`chat_lastRead_${convId}`, new Date().toISOString());
+        setUnreadConvIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(convId);
+            return newSet;
+        });
     };
 
     const fetchConversations = async () => {
@@ -104,8 +152,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     useEffect(() => {
         if (activeConvId) {
             fetchMessages(activeConvId);
-            // Marca como lida ao abrir
-            setUnreadCounts(prev => ({ ...prev, [activeConvId]: 0 }));
+            markAsRead(activeConvId);
         }
     }, [activeConvId]);
 
@@ -114,6 +161,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             if (!session?.user?.id) return;
             setLoading(true);
             await fetchConversations();
+            await checkUnreadConversations();
 
             if (initialBizId) {
                 const { data: conv } = await supabase
@@ -136,7 +184,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         init();
     }, [initialBizId, session?.user?.id]);
 
-    // Sistema Híbrido: Realtime + Polling Agressivo
     useEffect(() => {
         if (!session?.user?.id) return;
 
@@ -154,10 +201,9 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                 const incomingConvId = payload.new.conversation_id;
                 const senderId = payload.new.sender_id;
 
-                // Se não é mensagem minha e não estou vendo esse chat, incrementa contador
                 if (senderId !== session.user.id && activeConvIdRef.current !== incomingConvId) {
-                    console.log('🔔 [NOTIF] Incrementando contador para conversa:', incomingConvId);
-                    setUnreadCounts(prev => ({ ...prev, [incomingConvId]: (prev[incomingConvId] || 0) + 1 }));
+                    console.log('🔔 [NOTIF] Marcando conversa como não lida:', incomingConvId);
+                    setUnreadConvIds(prev => new Set(prev).add(incomingConvId));
                 }
 
                 if (activeConvIdRef.current === incomingConvId) {
@@ -191,6 +237,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                 fetchMessages(activeConvIdRef.current);
             }
             fetchConversations();
+            checkUnreadConversations();
         }, 5000);
 
         return () => {
@@ -239,8 +286,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         }
     };
 
-    // Calcula total de mensagens não lidas
-    const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+    const hasUnread = unreadConvIds.size > 0;
 
     if (loading && !activeConvId) {
         return (
@@ -262,10 +308,13 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                                 <ArrowLeft size={20} />
                             </button>
                         )}
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 relative">
                             <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
                                 {recipient?.logo ? <img src={recipient.logo} className="w-full h-full object-cover" /> : <User size={20} className="text-blue-600" />}
                             </div>
+                            {isListView && hasUnread && (
+                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
+                            )}
                             <div>
                                 <h1 className="text-sm font-black uppercase dark:text-white truncate max-w-[150px]">
                                     {isListView ? 'Minhas Conversas' : (recipient?.name || 'Profissional')}
@@ -288,23 +337,21 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                 {isListView ? (
                     <div className="h-full overflow-y-auto p-4 space-y-3">
                         {conversations.length > 0 ? conversations.map(c => {
-                            const unreadCount = unreadCounts[c.id] || 0;
+                            const isUnread = unreadConvIds.has(c.id);
                             return (
                                 <button key={c.id} onClick={() => { setRecipient(c.other); setActiveConvId(c.id); }} className="w-full flex items-center gap-4 p-4 bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm active:scale-95 transition-all relative">
-                                    {unreadCount > 0 && (
-                                        <div className="absolute top-2 right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg shadow-red-500/50">
-                                            <span className="text-[10px] font-black text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>
-                                        </div>
-                                    )}
-                                    <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 overflow-hidden shrink-0">
+                                    <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 overflow-hidden shrink-0 relative">
                                         <img src={c.other?.logo || 'https://picsum.photos/200'} className="w-full h-full object-cover" />
+                                        {isUnread && (
+                                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
+                                        )}
                                     </div>
                                     <div className="flex-1 text-left">
                                         <div className="flex justify-between items-center">
-                                            <span className={`text-xs font-bold uppercase ${unreadCount > 0 ? 'text-blue-600 dark:text-blue-400' : 'dark:text-white'}`}>{c.other?.name}</span>
+                                            <span className={`text-xs font-bold uppercase ${isUnread ? 'text-blue-600 dark:text-blue-400' : 'dark:text-white'}`}>{c.other?.name}</span>
                                             <span className="text-[9px] text-zinc-400 font-medium uppercase">{new Date(c.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
-                                        <p className={`text-[11px] line-clamp-1 italic mt-0.5 ${unreadCount > 0 ? 'text-zinc-900 dark:text-white font-bold' : 'text-zinc-500'}`}>{c.last_message || 'Abrir histórico...'}</p>
+                                        <p className={`text-[11px] line-clamp-1 italic mt-0.5 ${isUnread ? 'text-zinc-900 dark:text-white font-bold' : 'text-zinc-500'}`}>{c.last_message || 'Abrir histórico...'}</p>
                                     </div>
                                 </button>
                             )
@@ -332,7 +379,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                                             <p className="text-sm font-medium leading-relaxed">{m.content}</p>
                                             <div className="flex justify-end mt-2 items-center gap-1 opacity-50">
                                                 <span className="text-[8px] font-bold uppercase tracking-widest italic">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                {isMe && <CheckCheck size={10} />}
                                             </div>
                                         </div>
                                     </div>
