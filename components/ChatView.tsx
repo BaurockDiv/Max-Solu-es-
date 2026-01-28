@@ -247,12 +247,12 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             }
 
             console.log("Enviando mensagem para conv:", convId);
-            const { error: mErr } = await supabase.from('messages').insert({
+            const { data: sentMsg, error: mErr } = await supabase.from('messages').insert({
                 conversation_id: convId,
                 sender_id: session.user.id,
                 content: content,
                 type: type
-            });
+            }).select().single();
 
             if (mErr) {
                 console.error("Erro ao enviar mensagem:", mErr);
@@ -260,16 +260,26 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                 return;
             }
 
+            // Atualização Otimista / Local Instantânea
+            if (sentMsg) {
+                setMessages(prev => [...prev, sentMsg as Message]);
+            }
+
             await supabase.from('conversations').update({
                 last_message: type === 'text' ? content : `Arquivo de ${type}`,
                 updated_at: new Date().toISOString()
             }).eq('id', convId);
+
+            // Força recarregamento para garantir sincronia
+            await loadConversations();
+            await loadMessages(convId);
 
         } catch (err: any) {
             console.error("Critical Send error:", err);
             alert("Erro crítico: " + err.message);
         } finally {
             setSending(false);
+            scrollToBottom();
         }
     };
 
