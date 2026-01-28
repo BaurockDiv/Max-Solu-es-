@@ -264,14 +264,20 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         );
     }
 
+    // Lógica de Separação de Contexto:
+    // Se viemos de um perfil (initialBizId), queremos APENAS o chat, sem lista.
+    const isDirectChat = !!initialBizId;
+    const showList = !isDirectChat && !activeConv && !targetRecipient;
+
     return (
         <div className="h-full flex flex-col bg-zinc-50 dark:bg-black overflow-hidden">
             {/* Header */}
             <div className="pt-12 pb-4 px-4 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        {(activeConv || targetRecipient) && (
-                            <button onClick={() => { setActiveConv(null); setTargetRecipient(null); setMessages([]); }} className="p-2 -ml-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                        {/* Botão Voltar: Se for chat direto ou estiver em uma conversa, volta para onde o usuário estava */}
+                        {(isDirectChat || activeConv || targetRecipient) && (
+                            <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800">
                                 <ArrowLeft size={20} />
                             </button>
                         )}
@@ -285,10 +291,10 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                             </div>
                             <div>
                                 <h1 className="text-base font-bold dark:text-white uppercase tracking-tight">
-                                    {activeConv ? activeConv.other_participant?.name : (targetRecipient?.name || 'Mensagens')}
+                                    {activeConv ? activeConv.other_participant?.name : (targetRecipient?.name || (showList ? 'Minhas Conversas' : 'Carregando...'))}
                                 </h1>
                                 <p className="text-[10px] font-medium text-blue-600 uppercase tracking-widest leading-none">
-                                    {activeConv || targetRecipient ? 'Ativo agora' : `${conversations.length} conversas`}
+                                    {(activeConv || targetRecipient) ? 'Ativo agora' : `${conversations.length} conversas`}
                                 </p>
                             </div>
                         </div>
@@ -298,7 +304,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
             {/* Content */}
             <div className="flex-1 overflow-hidden relative">
-                {!activeConv && !targetRecipient ? (
+                {showList ? (
                     /* Conversas */
                     <div className="h-full overflow-y-auto p-4 space-y-3 no-scrollbar">
                         {conversations.map(c => (
