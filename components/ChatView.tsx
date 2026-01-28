@@ -39,7 +39,20 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        console.log("ChatView: Alvo inicial [ID]:", initialBizId);
+
         const initChat = async () => {
+            // Se temos um alvo inicial, já preparamos a UI do chat para não mostrar a lista vazia
+            if (initialBizId) {
+                setGhostChat({
+                    id: 'ghost',
+                    other_participant: { name: 'Carregando perfil...' },
+                    participant_1: session.user.id,
+                    participant_2: initialBizId,
+                    status: 'pending'
+                });
+            }
+
             setLoading(true);
             await loadConversations();
             setLoading(false);
@@ -51,7 +64,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
                 loadConversations();
                 if ((activeConv && payload.new.conversation_id === activeConv.id) ||
-                    (ghostChat && payload.new.sender_id === ghostChat.participant_2)) {
+                    (ghostChat && (payload.new.sender_id === ghostChat.participant_2 || payload.new.sender_id === session.user.id))) {
                     loadMessages(payload.new.conversation_id);
                 }
             })
@@ -98,8 +111,9 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
             setConversations(formatted);
 
-            // LOGICA DE ABERTURA FORÇADA
+            // LOGICA CRÍTICA DE ABERTURA
             if (initialBizId) {
+                // 1. Tenta achar na lista de conversas existentes
                 const existing = formatted.find(c =>
                     c.participant_1 === initialBizId ||
                     c.participant_2 === initialBizId ||
@@ -111,7 +125,17 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                     setGhostChat(null);
                     await loadMessages(existing.id);
                 } else {
-                    // Busca dados para o Ghost Chat
+                    // 2. Se não existe, força o Ghost Chat IMEDIATAMENTE
+                    // Primeiro um estado de carregamento para o header
+                    setGhostChat({
+                        id: 'ghost',
+                        other_participant: { name: 'Carregando...' },
+                        participant_1: session.user.id,
+                        participant_2: initialBizId,
+                        status: 'pending'
+                    });
+
+                    // Busca detalhes reais do profissional
                     const { data: biz } = await supabase
                         .from('businesses')
                         .select('name, logo, owner_id')
@@ -126,8 +150,25 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                             participant_2: initialBizId,
                             status: 'pending'
                         });
-                        setMessages([]); // Limpa mensagens anteriores
+                    } else {
+                        // Se nem o business existir por owner_id, tentamos por ID direto da empresa
+                        const { data: bizById } = await supabase
+                            .from('businesses')
+                            .select('name, logo, owner_id')
+                            .eq('id', initialBizId)
+                            .maybeSingle();
+
+                        if (bizById) {
+                            setGhostChat({
+                                id: 'ghost',
+                                other_participant: bizById,
+                                participant_1: session.user.id,
+                                participant_2: bizById.owner_id, // Atribui corretamente o dono
+                                status: 'pending'
+                            });
+                        }
                     }
+                    setMessages([]);
                 }
             }
         } catch (err) {
