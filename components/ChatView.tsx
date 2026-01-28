@@ -143,22 +143,53 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
             // Se for o primeiro envio, criamos a conversa no banco
             if (!convId) {
+                console.log("Sistema: Criando nova conversa entre", session.user.id, "e", targetId);
                 const [p1, p2] = [session.user.id, targetId].sort();
+
                 const { data: newC, error: cErr } = await supabase
                     .from('conversations')
                     .upsert({
                         participant_1: p1,
                         participant_2: p2,
-                        last_message: type === 'text' ? text.substring(0, 50) : `Arquivo: ${type}`
+                        last_message: type === 'text' ? text.substring(0, 50) : `Arquivo: ${type}`,
+                        updated_at: new Date().toISOString(),
+                        status: 'accepted'
                     }, { onConflict: 'participant_1,participant_2' })
                     .select()
-                    .single();
+                    .maybeSingle();
 
-                if (cErr) throw cErr;
-                convId = newC.id;
-                setActiveConvId(newC.id);
+                if (cErr) {
+                    console.warn("Aviso no Upsert (tentando busca manual):", cErr);
+                    // Tentativa de busca manual caso o upsert falhe por RLS
+                    const { data: manualSearch } = await supabase
+                        .from('conversations')
+                        .select('id')
+                        .or(`and(participant_1.eq.${p1},participant_2.eq.${p2}),and(participant_1.eq.${p2},participant_2.eq.${p1})`)
+                        .maybeSingle();
+
+                    if (manualSearch) {
+                        convId = manualSearch.id;
+                    } else {
+                        throw new Error(`Causa: ${cErr.message} (Código: ${cErr.code})`);
+                    }
+                } else if (newC) {
+                    convId = newC.id;
+                } else {
+                    // Caso o upsert não retorne nada mas não dê erro, fazemos uma busca final
+                    const { data: finalCheck } = await supabase
+                        .from('conversations')
+                        .select('id')
+                        .eq('participant_1', p1)
+                        .eq('participant_2', p2)
+                        .maybeSingle();
+                    convId = finalCheck?.id || null;
+                }
+
+                if (!convId) throw new Error("Não foi possível estabelecer conexão de chat.");
+                setActiveConvId(convId);
             }
 
+            console.log("Sistema: Enviando mensagem para ConvID", convId);
             // Grava a mensagem
             const { error: mErr } = await supabase.from('messages').insert({
                 conversation_id: convId,
@@ -169,15 +200,16 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
             if (mErr) throw mErr;
 
-            // Atualiza conversa
+            // Atualiza conversa (silencioso)
             await supabase.from('conversations')
                 .update({ last_message: type === 'text' ? text.substring(0, 50) : `Arquivo: ${type}`, updated_at: new Date().toISOString() })
-                .eq('id', convId);
+                .eq('id', convId)
+                .then();
 
-        } catch (err) {
-            console.error("Erro fatal no envio:", err);
+        } catch (err: any) {
+            console.error("ERRO DETALHADO NO ENVIO:", err);
             setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
-            alert("Erro ao enviar. Tente novamente.");
+            alert(`Erro ao enviar: ${err.message || 'Falha de conexão com o banco'}`);
         } finally {
             setSending(false);
         }
