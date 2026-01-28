@@ -5,7 +5,7 @@ import {
   Bar,
   ResponsiveContainer
 } from 'recharts';
-import { Eye, TrendingUp, PlayCircle, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { Eye, TrendingUp } from 'lucide-react';
 import { Business, MediaPost } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -16,27 +16,13 @@ interface DashboardViewProps {
 
 const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts: initialPosts }) => {
   const [activeMetric, setActiveMetric] = useState<'views' | 'clicks'>('views');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [posts, setPosts] = useState<MediaPost[]>(initialPosts);
+  const [posts] = useState<MediaPost[]>(initialPosts);
 
   const totalLikes = posts.reduce((acc, p) => acc + (p.likes || 0), 0);
   const totalViews = totalLikes * 15 + (posts.length * 120);
   const avgEngagement = posts.length > 0 ? (totalLikes / posts.length).toFixed(1) : "0";
 
-  const handleDeletePost = async (id: string) => {
-    if (!window.confirm("Tem certeza que deseja remover esta publicação permanentemente?")) return;
 
-    setDeletingId(id);
-    try {
-      const { error } = await supabase.from('posts').delete().eq('id', id);
-      if (error) throw error;
-      setPosts(prev => prev.filter(p => p.id !== id));
-    } catch (err: any) {
-      alert("Erro ao deletar: " + err.message);
-    } finally {
-      setDeletingId(null);
-    }
-  };
 
   // Gerar dados reais para o gráfico com base nos posts atuais
   const chartData = posts.length > 0
@@ -92,51 +78,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ business, userPosts: init
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-4">
-            <h3 className="text-[11px] font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-[0.5em]">Gerenciar Mídia</h3>
-            <span className="text-[9px] font-black text-zinc-400 uppercase">{posts.length} Itens</span>
-          </div>
-
-          <div className="space-y-5">
-            {posts.length > 0 ? posts.map(post => (
-              <div key={post.id} className="flex items-center gap-6 p-6 bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-[2.5rem] shadow-sm group">
-                <div className="relative w-20 h-20 rounded-[1.8rem] overflow-hidden shadow-lg border-2 border-white dark:border-black flex-shrink-0 bg-zinc-800">
-                  {post.type === 'video' ? (
-                    post.thumbnail_url ? (
-                      <img src={post.thumbnail_url} className="w-full h-full object-cover" />
-                    ) : (
-                      <video src={`${post.url}#t=0.5`} className="w-full h-full object-cover" preload="metadata" muted />
-                    )
-                  ) : (
-                    <img src={post.url} className="w-full h-full object-cover" />
-                  )}
-                  {post.type === 'video' && <div className="absolute inset-0 flex items-center justify-center bg-black/30"><PlayCircle className="text-white" size={24} /></div>}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-black text-zinc-950 dark:text-white uppercase tracking-tight line-clamp-1">{post.caption || "Sem Legenda"}</p>
-                  <div className="flex items-center gap-4 mt-1">
-                    <span className="text-[9px] text-zinc-600 dark:text-zinc-400 font-bold uppercase tracking-widest">{post.likes || 0} Curtidas • Impacto: {(post.likes || 0) * 12} pts</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleDeletePost(post.id)}
-                    disabled={deletingId === post.id}
-                    className="p-4 rounded-2xl bg-white dark:bg-red-900/10 text-red-600 border border-zinc-200 dark:border-none hover:bg-red-600 hover:text-white transition-all active:scale-90 shadow-sm"
-                  >
-                    {deletingId === post.id ? <Loader2 className="animate-spin" size={18} /> : <Trash2 size={18} />}
-                  </button>
-                </div>
-              </div>
-            )) : (
-              <div className="p-12 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-[3rem]">
-                <AlertCircle size={40} className="mx-auto text-zinc-300 dark:text-zinc-800 mb-4" />
-                <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Nenhuma mídia ativa no momento.</p>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );
