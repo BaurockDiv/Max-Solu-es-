@@ -31,6 +31,12 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     const [sending, setSending] = useState(false);
     const [newMessage, setNewMessage] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const activeConvIdRef = useRef<string | null>(null);
+
+    // Sincroniza o Ref com o Estado para o Realtime sempre ter o ID atualizado sem reiniciar a conexão
+    useEffect(() => {
+        activeConvIdRef.current = activeConvId;
+    }, [activeConvId]);
 
     const scrollToBottom = () => {
         setTimeout(() => {
@@ -184,52 +190,47 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     useEffect(() => {
         resolveChat();
 
-        // Canal de escuta simplificado e robusto
+        // Canal de escuta ÚNICO e PERSISTENTE (Não reinicia ao trocar chat)
         const channel = supabase
-            .channel(`universal_chat_${session.user.id}`)
+            .channel(`persistent_chat_${session.user.id}`)
             .on('postgres_changes', {
-                event: '*',
+                event: 'INSERT',
                 schema: 'public',
                 table: 'messages'
             }, (payload: any) => {
-                console.log("Realtime: Alteração detectada em Mensagens", payload);
+                const incomingConvId = payload.new.conversation_id;
+                console.log("Realtime: Mensagem recebida para conversa:", incomingConvId);
 
-                // Se o chat ativo está aberto, atualiza mensagens
-                if (activeConvId &&
-                    (payload.new.conversation_id === activeConvId ||
-                        payload.old?.conversation_id === activeConvId)) {
-                    fetchMessages(activeConvId);
+                // Se o chat recebido é o que usuário está vendo AGORA
+                if (activeConvIdRef.current === incomingConvId) {
+                    fetchMessages(incomingConvId);
                 }
 
-                // Sempre atualiza a lista de conversas para o "last_message"
+                // Em qualquer caso, atualiza a lista de conversas lateral
                 fetchConversations();
             })
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'conversations'
-            }, (payload: any) => {
-                console.log("Realtime: Alteração detectada em Conversas", payload);
+            }, () => {
                 fetchConversations();
             })
             .subscribe((status) => {
-                console.log("CONEXÃO REALTIME STATUS:", status);
-                if (status === 'SUBSCRIBED') {
-                    console.log("Chat: Sincronização viva e pronta.");
-                }
+                console.log("SINAL REALTIME:", status);
             });
 
-        // Fallback redundante para garantir que nada passe
-        const pulse = setInterval(() => {
-            if (activeConvId) fetchMessages(activeConvId);
+        // Verificação de segurança a cada 10 segundos
+        const heartBeat = setInterval(() => {
+            if (activeConvIdRef.current) fetchMessages(activeConvIdRef.current);
             fetchConversations();
         }, 10000);
 
         return () => {
             supabase.removeChannel(channel);
-            clearInterval(pulse);
+            clearInterval(heartBeat);
         };
-    }, [initialBizId, activeConvId, session?.user?.id]);
+    }, [session?.user?.id]); // SÓ reinicia se o usuário deslogar
 
     if (loading && !activeConvId && !recipient) {
         return (
