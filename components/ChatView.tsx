@@ -24,6 +24,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     const [activeConvId, setActiveConvId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [recipient, setRecipient] = useState<any>(null);
+    const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
@@ -103,6 +104,8 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     useEffect(() => {
         if (activeConvId) {
             fetchMessages(activeConvId);
+            // Marca como lida ao abrir
+            setUnreadCounts(prev => ({ ...prev, [activeConvId]: 0 }));
         }
     }, [activeConvId]);
 
@@ -140,7 +143,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         console.log('🔌 [CHAT] Iniciando sistema de sincronização...');
         setRealtimeStatus('connecting');
 
-        // Tentativa de Realtime
         const channel = supabase
             .channel(`chat_persistent_${session.user.id}`)
             .on('postgres_changes', {
@@ -150,6 +152,13 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             }, (payload: any) => {
                 console.log('📨 [REALTIME] Nova mensagem detectada!', payload.new);
                 const incomingConvId = payload.new.conversation_id;
+                const senderId = payload.new.sender_id;
+
+                // Se não é mensagem minha e não estou vendo esse chat, incrementa contador
+                if (senderId !== session.user.id && activeConvIdRef.current !== incomingConvId) {
+                    console.log('🔔 [NOTIF] Incrementando contador para conversa:', incomingConvId);
+                    setUnreadCounts(prev => ({ ...prev, [incomingConvId]: (prev[incomingConvId] || 0) + 1 }));
+                }
 
                 if (activeConvIdRef.current === incomingConvId) {
                     console.log('✅ [REALTIME] Atualizando chat ativo');
@@ -168,7 +177,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                 }
             });
 
-        // Timeout de conexão
         const timeout = setTimeout(() => {
             if (realtimeStatus === 'connecting') {
                 console.warn('⚠️ [REALTIME] Timeout - usando apenas polling');
@@ -176,7 +184,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             }
         }, 5000);
 
-        // Polling a cada 5 segundos (funciona mesmo sem Realtime)
         console.log('⏱️ [POLLING] Ativado (5s)');
         const polling = setInterval(() => {
             console.log('🔄 [POLLING] Verificando...');
@@ -232,6 +239,9 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         }
     };
 
+    // Calcula total de mensagens não lidas
+    const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+
     if (loading && !activeConvId) {
         return (
             <div className="h-full flex items-center justify-center bg-zinc-50 dark:bg-black">
@@ -277,20 +287,28 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             <div className="flex-1 overflow-hidden relative">
                 {isListView ? (
                     <div className="h-full overflow-y-auto p-4 space-y-3">
-                        {conversations.length > 0 ? conversations.map(c => (
-                            <button key={c.id} onClick={() => { setRecipient(c.other); setActiveConvId(c.id); }} className="w-full flex items-center gap-4 p-4 bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm active:scale-95 transition-all">
-                                <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 overflow-hidden shrink-0">
-                                    <img src={c.other?.logo || 'https://picsum.photos/200'} className="w-full h-full object-cover" />
-                                </div>
-                                <div className="flex-1 text-left">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs font-bold uppercase dark:text-white">{c.other?.name}</span>
-                                        <span className="text-[9px] text-zinc-400 font-medium uppercase">{new Date(c.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        {conversations.length > 0 ? conversations.map(c => {
+                            const unreadCount = unreadCounts[c.id] || 0;
+                            return (
+                                <button key={c.id} onClick={() => { setRecipient(c.other); setActiveConvId(c.id); }} className="w-full flex items-center gap-4 p-4 bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm active:scale-95 transition-all relative">
+                                    {unreadCount > 0 && (
+                                        <div className="absolute top-2 right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg shadow-red-500/50">
+                                            <span className="text-[10px] font-black text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                                        </div>
+                                    )}
+                                    <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 overflow-hidden shrink-0">
+                                        <img src={c.other?.logo || 'https://picsum.photos/200'} className="w-full h-full object-cover" />
                                     </div>
-                                    <p className="text-[11px] text-zinc-500 line-clamp-1 italic mt-0.5">{c.last_message || 'Abrir histórico...'}</p>
-                                </div>
-                            </button>
-                        )) : (
+                                    <div className="flex-1 text-left">
+                                        <div className="flex justify-between items-center">
+                                            <span className={`text-xs font-bold uppercase ${unreadCount > 0 ? 'text-blue-600 dark:text-blue-400' : 'dark:text-white'}`}>{c.other?.name}</span>
+                                            <span className="text-[9px] text-zinc-400 font-medium uppercase">{new Date(c.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                        <p className={`text-[11px] line-clamp-1 italic mt-0.5 ${unreadCount > 0 ? 'text-zinc-900 dark:text-white font-bold' : 'text-zinc-500'}`}>{c.last_message || 'Abrir histórico...'}</p>
+                                    </div>
+                                </button>
+                            )
+                        }) : (
                             <div className="h-full flex flex-col items-center justify-center opacity-30 py-20 grayscale">
                                 <MessageSquare size={48} className="mb-4" />
                                 <p className="text-[10px] font-black uppercase tracking-widest">Aguardando contatos</p>
