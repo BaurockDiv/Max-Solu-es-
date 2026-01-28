@@ -146,8 +146,9 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                     }
                 }
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Chat Load Error:", err);
+            // alert("Erro ao carregar conversas: " + err.message);
         }
     };
 
@@ -171,7 +172,9 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         setSending(true);
         try {
             let convId = currentConv.id;
+
             if (convId === 'ghost') {
+                console.log("Criando nova conversa...");
                 const { data: newConv, error: cErr } = await supabase.from('conversations').insert({
                     participant_1: session.user.id,
                     participant_2: currentConv.participant_2,
@@ -179,28 +182,39 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                     last_message: type === 'text' ? content : `Arquivo de ${type}`
                 }).select().single();
 
-                if (cErr) throw cErr;
+                if (cErr) {
+                    console.error("Erro ao criar conversa:", cErr);
+                    alert("Não foi possível iniciar a conversa: " + cErr.message);
+                    return;
+                }
+
                 convId = newConv.id;
                 setActiveConv({ ...newConv, other_participant: currentConv.other_participant });
                 setGhostChat(null);
             }
 
-            const { error } = await supabase.from('messages').insert({
+            console.log("Enviando mensagem para conv:", convId);
+            const { error: mErr } = await supabase.from('messages').insert({
                 conversation_id: convId,
                 sender_id: session.user.id,
                 content: content,
                 type: type
             });
 
-            if (error) throw error;
+            if (mErr) {
+                console.error("Erro ao enviar mensagem:", mErr);
+                alert("Erro ao enviar: " + mErr.message);
+                return;
+            }
 
             await supabase.from('conversations').update({
                 last_message: type === 'text' ? content : `Arquivo de ${type}`,
                 updated_at: new Date().toISOString()
             }).eq('id', convId);
 
-        } catch (err) {
-            console.error("Send error:", err);
+        } catch (err: any) {
+            console.error("Critical Send error:", err);
+            alert("Erro crítico: " + err.message);
         } finally {
             setSending(false);
         }
