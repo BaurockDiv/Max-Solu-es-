@@ -39,23 +39,28 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        loadConversations();
+        const initChat = async () => {
+            setLoading(true);
+            await loadConversations();
+            setLoading(false);
+        };
+        initChat();
 
         const messageChannel = supabase
             .channel('public:messages')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+                loadConversations();
                 if ((activeConv && payload.new.conversation_id === activeConv.id) ||
                     (ghostChat && payload.new.sender_id === ghostChat.participant_2)) {
                     loadMessages(payload.new.conversation_id);
                 }
-                loadConversations();
             })
             .subscribe();
 
         return () => {
             supabase.removeChannel(messageChannel);
         };
-    }, [initialBizId]); // Depend apenas do roteamento inicial
+    }, [initialBizId]); // Força recarregamento ao mudar o alvo do chat
 
     useEffect(() => {
         if (activeConv) {
@@ -76,10 +81,10 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             const { data, error } = await supabase
                 .from('conversations')
                 .select(`
-          *,
-          p1:businesses!conversations_participant_1_fkey(name, logo, owner_id),
-          p2:businesses!conversations_participant_2_fkey(name, logo, owner_id)
-        `)
+                  *,
+                  p1:businesses!conversations_participant_1_fkey(name, logo, owner_id),
+                  p2:businesses!conversations_participant_2_fkey(name, logo, owner_id)
+                `)
                 .or(`participant_1.eq.${session.user.id},participant_2.eq.${session.user.id}`)
                 .order('updated_at', { ascending: false });
 
@@ -88,26 +93,25 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             const formatted = data.map(c => {
                 const isP1 = c.participant_1 === session.user.id;
                 const other = isP1 ? c.p2 : c.p1;
-                return {
-                    ...c,
-                    other_participant: other
-                };
+                return { ...c, other_participant: other };
             });
 
             setConversations(formatted);
 
-            // AUTO-OPEN LOGIC
+            // LOGICA DE ABERTURA FORÇADA
             if (initialBizId) {
                 const existing = formatted.find(c =>
                     c.participant_1 === initialBizId ||
-                    c.participant_2 === initialBizId
+                    c.participant_2 === initialBizId ||
+                    (c.other_participant as any)?.owner_id === initialBizId
                 );
 
                 if (existing) {
                     setActiveConv(existing);
                     setGhostChat(null);
+                    await loadMessages(existing.id);
                 } else {
-                    // Se não existe, busca os dados da empresa para o Ghost Chat
+                    // Busca dados para o Ghost Chat
                     const { data: biz } = await supabase
                         .from('businesses')
                         .select('name, logo, owner_id')
@@ -122,22 +126,12 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                             participant_2: initialBizId,
                             status: 'pending'
                         });
-                    } else {
-                        // Fallback caso a query de business falhe ou demore
-                        setGhostChat({
-                            id: 'ghost',
-                            other_participant: { name: 'Profissional' },
-                            participant_1: session.user.id,
-                            participant_2: initialBizId,
-                            status: 'pending'
-                        });
+                        setMessages([]); // Limpa mensagens anteriores
                     }
                 }
             }
         } catch (err) {
             console.error("Chat Load Error:", err);
-        } finally {
-            setLoading(false);
         }
     };
 
