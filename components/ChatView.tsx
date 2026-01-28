@@ -193,34 +193,53 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             let convId = currentConv.id;
 
             if (convId === 'ghost') {
-                console.log("Verificando existencia final antes de inserir...");
-                // Double check final para evitar unique constraint violation
-                const { data: lastCheck } = await supabase
-                    .from('conversations')
-                    .select('id')
-                    .or(`and(participant_1.eq.${session.user.id},participant_2.eq.${currentConv.participant_2}),and(participant_2.eq.${session.user.id},participant_1.eq.${currentConv.participant_2})`)
-                    .maybeSingle();
+                console.log("Tentando iniciar conversa...");
+                // Tenta insert direto. Se falhar por duplicidade, o catch resolve.
+                const { data: newConv, error: cErr } = await supabase.from('conversations').insert({
+                    participant_1: session.user.id,
+                    participant_2: currentConv.participant_2,
+                    status: 'pending',
+                    last_message: type === 'text' ? content : `Arquivo de ${type}`
+                }).select().maybeSingle();
 
-                if (lastCheck) {
-                    console.log("Conversa já existia por garantia, cancelando insert e usando a existente:", lastCheck.id);
-                    convId = lastCheck.id;
-                    // Atualiza a UI para a conversa real
-                    await loadConversations();
-                } else {
-                    console.log("Inserindo nova conversa no banco...");
-                    const { data: newConv, error: cErr } = await supabase.from('conversations').insert({
-                        participant_1: session.user.id,
-                        participant_2: currentConv.participant_2,
-                        status: 'pending',
-                        last_message: type === 'text' ? content : `Arquivo de ${type}`
-                    }).select().single();
+                if (cErr) {
+                    // Erro 23505 = Unique Violation (Conversa já existe)
+                    if (cErr.code === '23505') {
+                        console.log("Conversa já existe no banco, recuperando com busca direta...");
 
-                    if (cErr) {
+                        // Busca tentativa 1 (A, B)
+                        let { data: rec } = await supabase
+                            .from('conversations')
+                            .select('id')
+                            .eq('participant_1', session.user.id)
+                            .eq('participant_2', currentConv.participant_2)
+                            .maybeSingle();
+
+                        // Busca tentativa 2 (B, A)
+                        if (!rec) {
+                            const { data: rec2 } = await supabase
+                                .from('conversations')
+                                .select('id')
+                                .eq('participant_1', currentConv.participant_2)
+                                .eq('participant_2', session.user.id)
+                                .maybeSingle();
+                            rec = rec2;
+                        }
+
+                        if (rec) {
+                            convId = rec.id;
+                            console.log("Conversa recuperada com sucesso:", convId);
+                            await loadConversations();
+                        } else {
+                            // Se nem a busca direta achou, algo está muito errado com RLS ou IDs
+                            console.error("Conflito de ID mas busca falhou. Verifique as políticas de RLS.");
+                            return;
+                        }
+                    } else {
                         console.error("Erro ao criar conversa:", cErr);
-                        alert("Não foi possível iniciar a conversa: " + cErr.message);
                         return;
                     }
-
+                } else if (newConv) {
                     convId = newConv.id;
                     setActiveConv({ ...newConv, other_participant: currentConv.other_participant });
                     setGhostChat(null);
