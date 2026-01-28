@@ -50,7 +50,15 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
             if (error) throw error;
 
-            const formatted = await Promise.all(data.map(async (c) => {
+            // Deduplicação Inteligente: Garante que cada par de usuários apareça apenas uma vez
+            const uniqueMap = new Map();
+            for (const c of data) {
+                const pairKey = [c.participant_1, c.participant_2].sort().join(':');
+                if (!uniqueMap.has(pairKey)) uniqueMap.set(pairKey, c);
+            }
+            const uniqueData = Array.from(uniqueMap.values());
+
+            const formatted = await Promise.all(uniqueData.map(async (c: any) => {
                 const isP1 = c.participant_1 === session.user.id;
                 const otherId = isP1 ? c.participant_2 : c.participant_1;
 
