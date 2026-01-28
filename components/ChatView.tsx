@@ -20,20 +20,18 @@ interface ChatViewProps {
 }
 
 const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) => {
-    // 1. Estados Centrais
     const [conversations, setConversations] = useState<any[]>([]);
     const [activeConvId, setActiveConvId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [recipient, setRecipient] = useState<any>(null);
 
-    // 2. Estados de Controle
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [newMessage, setNewMessage] = useState('');
+    const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed'>('connecting');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const activeConvIdRef = useRef<string | null>(null);
 
-    // Sincroniza o ref sempre que activeConvId mudar
     useEffect(() => {
         activeConvIdRef.current = activeConvId;
     }, [activeConvId]);
@@ -44,7 +42,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         }, 100);
     };
 
-    // 3. Funções de Busca com Alertas Críticos
     const fetchConversations = async () => {
         if (!session?.user?.id) return;
         try {
@@ -56,7 +53,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
             if (error) throw error;
 
-            // Deduplicação Inteligente: Garante que cada par de usuários apareça apenas uma vez
             const uniqueMap = new Map();
             for (const c of data) {
                 const pairKey = [c.participant_1, c.participant_2].sort().join(':');
@@ -81,13 +77,14 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             }));
             setConversations(formatted);
         } catch (err: any) {
-            alert(`Erro na Lista de Conversas: ${err.message}`);
+            console.error('[FETCH] Erro ao buscar conversas:', err);
         }
     };
 
     const fetchMessages = async (id: string) => {
         if (!id) return;
         try {
+            console.log(`🔍 [FETCH] Buscando mensagens para conversa: ${id}`);
             const { data, error } = await supabase
                 .from('messages')
                 .select('*')
@@ -95,21 +92,20 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
+            console.log(`✅ [FETCH] ${data.length} mensagens carregadas`);
             setMessages(data as Message[]);
             scrollToBottom('auto');
         } catch (err: any) {
-            alert(`Erro ao Carregar Histórico: ${err.message}`);
+            console.error('[FETCH] Erro ao buscar mensagens:', err);
         }
     };
 
-    // 4. Efeito Especial: Sempre busca mensagens ao mudar o ID ativo
     useEffect(() => {
         if (activeConvId) {
             fetchMessages(activeConvId);
         }
     }, [activeConvId]);
 
-    // 5. Inicialização (Resolve Chat Direto)
     useEffect(() => {
         const init = async () => {
             if (!session?.user?.id) return;
@@ -117,18 +113,14 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             await fetchConversations();
 
             if (initialBizId) {
-                // Tenta achar conversa existente
                 const { data: conv } = await supabase
                     .from('conversations')
                     .select('id')
                     .or(`and(participant_1.eq.${session.user.id},participant_2.eq.${initialBizId}),and(participant_1.eq.${initialBizId},participant_2.eq.${session.user.id})`)
                     .maybeSingle();
 
-                if (conv) {
-                    setActiveConvId(conv.id);
-                }
+                if (conv) setActiveConvId(conv.id);
 
-                // Busca dados do destinatário
                 const { data: biz } = await supabase
                     .from('businesses')
                     .select('name, logo, owner_id')
@@ -141,12 +133,14 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         init();
     }, [initialBizId, session?.user?.id]);
 
-    // 6. Realtime Persistente (Conexão Única e Estável)
+    // Sistema Híbrido: Realtime + Polling Agressivo
     useEffect(() => {
         if (!session?.user?.id) return;
 
-        console.log('🔌 Conectando ao Realtime...');
+        console.log('🔌 [CHAT] Iniciando sistema de sincronização...');
+        setRealtimeStatus('connecting');
 
+        // Tentativa de Realtime
         const channel = supabase
             .channel(`chat_persistent_${session.user.id}`)
             .on('postgres_changes', {
@@ -154,36 +148,51 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                 schema: 'public',
                 table: 'messages'
             }, (payload: any) => {
-                console.log('📨 Nova mensagem detectada:', payload.new);
+                console.log('📨 [REALTIME] Nova mensagem detectada!', payload.new);
                 const incomingConvId = payload.new.conversation_id;
 
-                // Se a mensagem é da conversa ativa, atualiza imediatamente
                 if (activeConvIdRef.current === incomingConvId) {
-                    console.log('✅ Atualizando chat ativo');
+                    console.log('✅ [REALTIME] Atualizando chat ativo');
                     fetchMessages(incomingConvId);
                 }
-
-                // Sempre atualiza a lista de conversas
                 fetchConversations();
             })
             .subscribe((status) => {
-                console.log('🔔 Status do Realtime:', status);
+                console.log('🔔 [REALTIME] Status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ [REALTIME] Conectado!');
+                    setRealtimeStatus('connected');
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    console.error('❌ [REALTIME] Falhou:', status);
+                    setRealtimeStatus('failed');
+                }
             });
 
-        // Polling de fallback a cada 8 segundos
-        const pollingInterval = setInterval(() => {
+        // Timeout de conexão
+        const timeout = setTimeout(() => {
+            if (realtimeStatus === 'connecting') {
+                console.warn('⚠️ [REALTIME] Timeout - usando apenas polling');
+                setRealtimeStatus('failed');
+            }
+        }, 5000);
+
+        // Polling a cada 5 segundos (funciona mesmo sem Realtime)
+        console.log('⏱️ [POLLING] Ativado (5s)');
+        const polling = setInterval(() => {
+            console.log('🔄 [POLLING] Verificando...');
             if (activeConvIdRef.current) {
                 fetchMessages(activeConvIdRef.current);
             }
             fetchConversations();
-        }, 8000);
+        }, 5000);
 
         return () => {
-            console.log('🔌 Desconectando Realtime...');
+            console.log('🔌 [CHAT] Desconectando...');
+            clearTimeout(timeout);
+            clearInterval(polling);
             supabase.removeChannel(channel);
-            clearInterval(pollingInterval);
         };
-    }, [session?.user?.id]); // Só reinicia se o usuário mudar
+    }, [session?.user?.id]);
 
     const handleSendMessage = async () => {
         const text = newMessage.trim();
@@ -235,7 +244,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
     return (
         <div className="h-full flex flex-col bg-zinc-50 dark:bg-black overflow-hidden relative">
-            {/* Top Bar */}
             <div className="pt-12 pb-4 px-4 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -252,8 +260,8 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                                 <h1 className="text-sm font-black uppercase dark:text-white truncate max-w-[150px]">
                                     {isListView ? 'Minhas Conversas' : (recipient?.name || 'Profissional')}
                                 </h1>
-                                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest leading-none">
-                                    {isListView ? `${conversations.length} Contatos` : 'Conexão Restaurada'}
+                                <p className="text-[10px] font-bold uppercase tracking-widest leading-none" style={{ color: realtimeStatus === 'connected' ? '#10b981' : realtimeStatus === 'failed' ? '#f59e0b' : '#3b82f6' }}>
+                                    {isListView ? `${conversations.length} Contatos` : (realtimeStatus === 'connected' ? 'Realtime Ativo' : realtimeStatus === 'failed' ? 'Modo Polling' : 'Conectando...')}
                                 </p>
                             </div>
                         </div>
@@ -266,7 +274,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                 </div>
             </div>
 
-            {/* Content Area */}
             <div className="flex-1 overflow-hidden relative">
                 {isListView ? (
                     <div className="h-full overflow-y-auto p-4 space-y-3">
@@ -316,7 +323,6 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input Area */}
                         <div className="p-4 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 pb-10">
                             <div className="flex items-center gap-2 max-w-5xl mx-auto shadow-inner bg-zinc-50 dark:bg-zinc-800/50 rounded-[1.8rem] p-1 px-3">
                                 <input
