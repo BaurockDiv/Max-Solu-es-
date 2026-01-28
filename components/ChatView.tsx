@@ -111,35 +111,25 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
             setConversations(formatted);
 
-            // LOGICA CRÍTICA DE ABERTURA
+            setConversations(formatted);
+
+            // LOGICA DE SINCRO: Tenta encontrar a conversa com o alvo
             if (initialBizId) {
-                // 1. Tenta achar na lista de conversas existentes
-                const existing = formatted.find(c =>
+                const target = formatted.find(c =>
                     c.participant_1 === initialBizId ||
                     c.participant_2 === initialBizId ||
                     (c.other_participant as any)?.owner_id === initialBizId
                 );
 
-                if (existing) {
-                    setActiveConv(existing);
+                if (target) {
+                    setActiveConv(target);
                     setGhostChat(null);
-                    await loadMessages(existing.id);
                 } else {
-                    // 2. Se não existe, força o Ghost Chat IMEDIATAMENTE
-                    // Primeiro um estado de carregamento para o header
-                    setGhostChat({
-                        id: 'ghost',
-                        other_participant: { name: 'Carregando...' },
-                        participant_1: session.user.id,
-                        participant_2: initialBizId,
-                        status: 'pending'
-                    });
-
-                    // Busca detalhes reais do profissional
+                    // Não achou na lista? Força busca do perfil para o Ghost Chat
                     const { data: biz } = await supabase
                         .from('businesses')
-                        .select('name, logo, owner_id')
-                        .eq('owner_id', initialBizId)
+                        .select('name, logo, owner_id, id')
+                        .or(`owner_id.eq.${initialBizId},id.eq.${initialBizId}`)
                         .maybeSingle();
 
                     if (biz) {
@@ -147,28 +137,10 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                             id: 'ghost',
                             other_participant: biz,
                             participant_1: session.user.id,
-                            participant_2: initialBizId,
+                            participant_2: biz.owner_id,
                             status: 'pending'
                         });
-                    } else {
-                        // Se nem o business existir por owner_id, tentamos por ID direto da empresa
-                        const { data: bizById } = await supabase
-                            .from('businesses')
-                            .select('name, logo, owner_id')
-                            .eq('id', initialBizId)
-                            .maybeSingle();
-
-                        if (bizById) {
-                            setGhostChat({
-                                id: 'ghost',
-                                other_participant: bizById,
-                                participant_1: session.user.id,
-                                participant_2: bizById.owner_id, // Atribui corretamente o dono
-                                status: 'pending'
-                            });
-                        }
                     }
-                    setMessages([]);
                 }
             }
         } catch (err) {
@@ -282,7 +254,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
             </div>
 
             <div className="flex-1 overflow-hidden relative">
-                {(!activeConv && !ghostChat) ? (
+                {(!activeConv && !ghostChat && !initialBizId) ? (
                     /* LISTA DE CONVERSAS */
                     <div className="h-full overflow-y-auto px-4 py-6 space-y-4 no-scrollbar">
                         {conversations.length > 0 ? conversations.map(c => (

@@ -38,7 +38,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, sess
     setFollowing(newFollows.includes(business.id));
   };
 
-  const handleStartChat = async () => {
+  const handleStartChat = () => {
     if (!session) {
       alert("Faça login para enviar mensagens.");
       return;
@@ -49,28 +49,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ business, posts, onBack, sess
       return;
     }
 
-    try {
-      // Verifica se conversa já existe
-      const { data: existing } = await supabase
-        .from('conversations')
-        .select('id')
-        .or(`and(participant_1.eq.${session.user.id},participant_2.eq.${business.owner_id}),and(participant_1.eq.${business.owner_id},participant_2.eq.${session.user.id})`)
-        .single();
-
-      if (!existing) {
-        // Cria nova solicitação de conversa
-        await supabase.from('conversations').insert({
-          participant_1: session.user.id,
-          participant_2: business.owner_id,
-          status: 'pending'
-        });
-      }
-
-      onStartChat(business.owner_id);
-    } catch (err) {
-      console.error("Chat error:", err);
-      onStartChat(business.owner_id); // Tenta abrir mesmo assim
-    }
+    onStartChat(business.owner_id);
   };
 
   const handleContact = (type: 'whatsapp' | 'email' | 'phone') => {
