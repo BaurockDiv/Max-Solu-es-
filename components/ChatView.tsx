@@ -31,6 +31,12 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     const [sending, setSending] = useState(false);
     const [newMessage, setNewMessage] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const activeConvIdRef = useRef<string | null>(null);
+
+    // Sincroniza o ref sempre que activeConvId mudar
+    useEffect(() => {
+        activeConvIdRef.current = activeConvId;
+    }, [activeConvId]);
 
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
         setTimeout(() => {
@@ -135,20 +141,49 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         init();
     }, [initialBizId, session?.user?.id]);
 
-    // 6. Realtime Persistente
+    // 6. Realtime Persistente (Conexão Única e Estável)
     useEffect(() => {
+        if (!session?.user?.id) return;
+
+        console.log('🔌 Conectando ao Realtime...');
+
         const channel = supabase
-            .channel(`chat_realtime_${session?.user?.id}`)
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
-                if (activeConvId === payload.new.conversation_id) {
-                    fetchMessages(activeConvId);
+            .channel(`chat_persistent_${session.user.id}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages'
+            }, (payload: any) => {
+                console.log('📨 Nova mensagem detectada:', payload.new);
+                const incomingConvId = payload.new.conversation_id;
+
+                // Se a mensagem é da conversa ativa, atualiza imediatamente
+                if (activeConvIdRef.current === incomingConvId) {
+                    console.log('✅ Atualizando chat ativo');
+                    fetchMessages(incomingConvId);
                 }
+
+                // Sempre atualiza a lista de conversas
                 fetchConversations();
             })
-            .subscribe();
+            .subscribe((status) => {
+                console.log('🔔 Status do Realtime:', status);
+            });
 
-        return () => { supabase.removeChannel(channel); };
-    }, [activeConvId]);
+        // Polling de fallback a cada 8 segundos
+        const pollingInterval = setInterval(() => {
+            if (activeConvIdRef.current) {
+                fetchMessages(activeConvIdRef.current);
+            }
+            fetchConversations();
+        }, 8000);
+
+        return () => {
+            console.log('🔌 Desconectando Realtime...');
+            supabase.removeChannel(channel);
+            clearInterval(pollingInterval);
+        };
+    }, [session?.user?.id]); // Só reinicia se o usuário mudar
 
     const handleSendMessage = async () => {
         const text = newMessage.trim();
