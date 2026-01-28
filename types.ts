@@ -38,7 +38,7 @@ export interface Message {
   conversation_id: string;
   sender_id: string;
   content: string;
-  type: 'text' | 'image' | 'audio';
+  type: 'text' | 'image' | 'audio' | 'video';
   created_at: string;
 }
 
