@@ -152,8 +152,7 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                         participant_1: p1,
                         participant_2: p2,
                         last_message: type === 'text' ? text.substring(0, 50) : `Arquivo: ${type}`,
-                        updated_at: new Date().toISOString(),
-                        status: 'accepted'
+                        updated_at: new Date().toISOString()
                     }, { onConflict: 'participant_1,participant_2' })
                     .select()
                     .maybeSingle();
