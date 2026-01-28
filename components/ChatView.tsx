@@ -36,6 +36,9 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [ghostChat, setGhostChat] = useState<any>(null);
+    const [recording, setRecording] = useState(false);
+    const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -160,24 +163,20 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
         }
     };
 
-    const sendMessage = async () => {
+    const sendMessage = async (content: string, type: 'text' | 'image' | 'audio' | 'video' = 'text') => {
         const currentConv = activeConv || ghostChat;
-        if (!newMessage.trim() || !currentConv) return;
+        if (!content.trim() && type === 'text') return;
+        if (!currentConv) return;
 
         setSending(true);
-        const content = newMessage;
-        setNewMessage('');
-
         try {
             let convId = currentConv.id;
-
-            // Se for chat fantasma, cria a conversa agora
             if (convId === 'ghost') {
                 const { data: newConv, error: cErr } = await supabase.from('conversations').insert({
                     participant_1: session.user.id,
                     participant_2: currentConv.participant_2,
                     status: 'pending',
-                    last_message: content
+                    last_message: type === 'text' ? content : `Arquivo de ${type}`
                 }).select().single();
 
                 if (cErr) throw cErr;
@@ -190,21 +189,78 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                 conversation_id: convId,
                 sender_id: session.user.id,
                 content: content,
-                type: 'text'
+                type: type
             });
 
             if (error) throw error;
 
             await supabase.from('conversations').update({
-                last_message: content,
+                last_message: type === 'text' ? content : `Arquivo de ${type}`,
                 updated_at: new Date().toISOString()
             }).eq('id', convId);
 
         } catch (err) {
             console.error("Send error:", err);
-            setNewMessage(content); // Revert
         } finally {
             setSending(false);
+        }
+    };
+
+    const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setSending(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `chat/${Date.now()}.${fileExt}`;
+            const { data, error } = await supabase.storage.from('media').upload(fileName, file);
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(data.path);
+            const type = file.type.startsWith('video') ? 'video' : 'image';
+            await sendMessage(publicUrl, type as any);
+        } catch (err) {
+            console.error("Upload error:", err);
+            alert("Erro ao enviar mídia.");
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream);
+            const chunks: Blob[] = [];
+
+            recorder.ondataavailable = (e) => chunks.push(e.data);
+            recorder.onstop = async () => {
+                const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                const fileName = `chat/audio-${Date.now()}.webm`;
+                const { data, error } = await supabase.storage.from('media').upload(fileName, audioBlob);
+
+                if (!error) {
+                    const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(data.path);
+                    await sendMessage(publicUrl, 'audio');
+                }
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            recorder.start();
+            setMediaRecorder(recorder);
+            setRecording(true);
+        } catch (err) {
+            console.error("Mic error:", err);
+            alert("Permita o acesso ao microfone.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorder) {
+            mediaRecorder.stop();
+            setRecording(false);
+            setMediaRecorder(null);
         }
     };
 
@@ -307,7 +363,17 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                                             ? 'bg-blue-600 text-white rounded-br-none shadow-xl shadow-blue-500/20'
                                             : 'bg-white dark:bg-zinc-900 text-zinc-950 dark:text-zinc-100 rounded-bl-none border border-zinc-200 dark:border-zinc-800 shadow-sm'
                                             }`}>
-                                            <p className="text-sm font-medium leading-relaxed">{m.content}</p>
+                                            {m.type === 'text' && <p className="text-sm font-medium leading-relaxed">{m.content}</p>}
+                                            {m.type === 'image' && <img src={m.content} className="max-w-full rounded-xl" alt="Mídia" />}
+                                            {m.type === 'video' && <video src={m.content} controls className="max-w-full rounded-xl" />}
+                                            {m.type === 'audio' && (
+                                                <div className="flex items-center gap-3 py-2">
+                                                    <div className={`p-2 rounded-full ${isMe ? 'bg-white/20' : 'bg-blue-600/10 text-blue-600'}`}>
+                                                        <Mic size={16} />
+                                                    </div>
+                                                    <audio src={m.content} controls className="h-8 max-w-[150px] md:max-w-xs" />
+                                                </div>
+                                            )}
                                             <div className={`flex items-center gap-1 mt-1.5 ${isMe ? 'justify-end text-blue-100' : 'justify-start text-zinc-400'}`}>
                                                 <span className="text-[8px] font-black uppercase tracking-tighter">
                                                     {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -323,30 +389,48 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
 
                         {/* Input Estilo Premium */}
                         <div className="p-6 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 shrink-0 pb-12">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleMediaUpload}
+                                className="hidden"
+                                accept="image/*,video/*"
+                            />
+
                             <div className="flex items-center gap-3">
                                 <div className="flex gap-2">
-                                    <button className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:text-blue-600 transition-colors">
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:text-blue-600 transition-colors"
+                                    >
                                         <Plus size={24} />
-                                    </button>
-                                    <button className="hidden md:flex w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">
-                                        <Paperclip size={20} />
                                     </button>
                                 </div>
 
                                 <div className="flex-1 relative">
-                                    <input
-                                        type="text"
-                                        value={newMessage}
-                                        onChange={(e) => setNewMessage(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                                        placeholder="Escreva sua mensagem profissional..."
-                                        className="w-full h-12 bg-zinc-100 dark:bg-zinc-800 border-none rounded-2xl px-5 text-sm font-medium text-zinc-950 dark:text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-600 transition-all shadow-inner"
-                                    />
+                                    {recording ? (
+                                        <div className="w-full h-12 bg-red-600/10 rounded-2xl flex items-center justify-between px-5 animate-pulse">
+                                            <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">Gravando Áudio...</span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-red-600 rounded-full" />
+                                                <button onClick={stopRecording} className="text-red-950 dark:text-white font-black text-[10px] uppercase">Parar</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={newMessage}
+                                            onChange={(e) => setNewMessage(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && sendMessage(newMessage)}
+                                            placeholder="Escreva sua mensagem profissional..."
+                                            className="w-full h-12 bg-zinc-100 dark:bg-zinc-800 border-none rounded-2xl px-5 text-sm font-medium text-zinc-950 dark:text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-600 transition-all shadow-inner"
+                                        />
+                                    )}
                                 </div>
 
-                                {newMessage.trim() ? (
+                                {(newMessage.trim() && !recording) ? (
                                     <button
-                                        onClick={sendMessage}
+                                        onClick={() => { sendMessage(newMessage); setNewMessage(''); }}
                                         disabled={sending}
                                         className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 active:scale-90 transition-all"
                                     >
@@ -354,10 +438,16 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
                                     </button>
                                 ) : (
                                     <div className="flex gap-2">
-                                        <button className="w-12 h-12 rounded-2xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center">
+                                        <button
+                                            onClick={recording ? stopRecording : startRecording}
+                                            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${recording ? 'bg-red-600 text-white animate-pulse' : 'bg-emerald-600/10 text-emerald-600'}`}
+                                        >
                                             <Mic size={22} />
                                         </button>
-                                        <button className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500"
+                                        >
                                             <ImageIcon size={22} />
                                         </button>
                                     </div>
