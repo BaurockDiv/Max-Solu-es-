@@ -25,6 +25,8 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('maxcompany-theme') as 'light' | 'dark') || 'dark');
   const [activeChatBizId, setActiveChatBizId] = useState<string | null>(null);
   const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
+  const [showProfileBadge, setShowProfileBadge] = useState(false);
+  const [showMessagesBadge, setShowMessagesBadge] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('maxcompany-theme', theme);
@@ -58,10 +60,12 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Polling para mensagens não lidas
+  // Sistema de Notificações em 3 Níveis
   useEffect(() => {
     if (!session?.user?.id) {
       setTotalUnreadMessages(0);
+      setShowProfileBadge(false);
+      setShowMessagesBadge(false);
       return;
     }
 
@@ -96,7 +100,24 @@ const App: React.FC = () => {
             }
           }
         }
+
         setTotalUnreadMessages(hasUnread ? 1 : 0);
+
+        // Nível 1: Badge no Perfil (some ao clicar na aba)
+        const profileViewed = localStorage.getItem('notif_profile_viewed');
+        if (hasUnread && (!profileViewed || new Date(profileViewed).getTime() < Date.now() - 1000)) {
+          setShowProfileBadge(true);
+        } else {
+          setShowProfileBadge(false);
+        }
+
+        // Nível 2: Badge no botão Mensagens (some ao clicar no botão)
+        const messagesViewed = localStorage.getItem('notif_messages_viewed');
+        if (hasUnread && (!messagesViewed || new Date(messagesViewed).getTime() < Date.now() - 1000)) {
+          setShowMessagesBadge(true);
+        } else {
+          setShowMessagesBadge(false);
+        }
       } catch (err) {
         console.error('[UNREAD] Erro ao verificar:', err);
       }
@@ -148,111 +169,105 @@ const App: React.FC = () => {
       const fileName = `posts/${session.user.id}-${Date.now()}.${fileExt}`;
       const arrayBuffer = await blob.arrayBuffer();
 
-      onProgress(30, 'Enviando arquivo...');
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(fileName, arrayBuffer, { contentType: mimeType, upsert: true });
+      onProgress(30, 'Enviando...');
+      const { data, error } = await supabase.storage.from('media').upload(fileName, arrayBuffer, { contentType: mimeType, upsert: true });
+      if (error) throw error;
 
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(uploadData.path);
+      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(data.path);
+      let thumbnailUrl = publicUrl;
 
-      // Upload Thumbnail if exists (for videos)
-      let thumbUrl = null;
-      if (thumbnailBlob) {
-        onProgress(50, 'Enviando miniatura...');
-        const thumbName = `thumbs/${session.user.id}-${Date.now()}.jpg`;
+      if (type === 'video' && thumbnailBlob) {
+        onProgress(60, 'Gerando capa...');
+        const thumbName = `posts/${session.user.id}-${Date.now()}-thumb.jpg`;
         const thumbBuffer = await thumbnailBlob.arrayBuffer();
-        const { data: thumbData, error: thumbError } = await supabase.storage
-          .from('media')
-          .upload(thumbName, thumbBuffer, { contentType: 'image/jpeg', upsert: true });
-
-        if (!thumbError) {
-          const { data: { publicUrl: tUrl } } = supabase.storage.from('media').getPublicUrl(thumbData.path);
-          thumbUrl = tUrl;
+        const { data: thumbData, error: thumbError } = await supabase.storage.from('media').upload(thumbName, thumbBuffer, { contentType: 'image/jpeg', upsert: true });
+        if (!thumbError && thumbData) {
+          const { data: { publicUrl: thumbUrl } } = supabase.storage.from('media').getPublicUrl(thumbData.path);
+          thumbnailUrl = thumbUrl;
         }
       }
 
-      onProgress(80, 'Finalizando...');
-
+      onProgress(80, 'Publicando...');
       const { error: dbError } = await supabase.from('posts').insert({
         business_id: userBusiness.id,
-        type: type,
         media_url: publicUrl,
-        caption: caption || "",
-        thumbnail_url: type === 'image' ? publicUrl : thumbUrl
+        thumbnail_url: thumbnailUrl,
+        type,
+        caption
       });
 
       if (dbError) throw dbError;
-
+      onProgress(100, 'Concluído!');
       await fetchData();
-      setActiveTab('feed');
     } catch (err: any) {
-      console.error("Falha no Post:", err);
-      throw err;
+      throw new Error(err.message || 'Erro ao publicar.');
     }
-  };
-
-  const openProfile = async (id: string, fromTab: ViewState) => {
-    setLoading(true);
-    // Tenta encontrar nos posts carregados primeiro (cache)
-    let biz = allPosts.find(p => p.businessId === id || p.business?.id === id)?.business;
-
-    if (!biz) {
-      // Se não estiver nos posts, busca direto no banco
-      const { data, error } = await supabase.from('businesses').select('*').eq('id', id).single();
-      if (data) biz = data as any;
-    }
-
-    if (biz) {
-      setSelectedBusiness(biz as any);
-      setLastTab(fromTab);
-      setActiveTab('profile');
-    }
-    setLoading(false);
   };
 
   const renderContent = () => {
-    const requireAuth = ['record', 'dashboard', 'me', 'chat'];
-    if (requireAuth.includes(activeTab) && !session) {
-      return <AuthView onBack={() => setActiveTab('feed')} />;
-    }
+    if (loading) return <div className="flex-1 flex items-center justify-center bg-white dark:bg-black"><div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
+    if (!session && activeTab === 'me') return <AuthView />;
+
     switch (activeTab) {
-      case 'feed': return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} onRefresh={fetchData} userId={session?.user.id} />;
-      case 'discovery': return <DiscoveryView onBusinessClick={(id) => openProfile(id, 'discovery')} />;
-      case 'following': return <FollowingView onProfileClick={(id) => openProfile(id, 'following')} userId={session?.user.id} />;
-      case 'profile': return <ProfileView session={session} business={selectedBusiness!} posts={allPosts.filter(p => p.businessId === selectedBusiness?.id)} onBack={() => setActiveTab(lastTab)} onStartChat={(bizId) => { setActiveChatBizId(bizId); setActiveTab('chat'); }} />;
-      case 'dashboard': return <DashboardView business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} />;
-      case 'me': return <MeView session={session} business={userBusiness} userPosts={allPosts.filter(p => p.businessId === userBusiness?.id)} onUpdateBusiness={handleUpdateBusiness} theme={theme} onToggleTheme={setTheme} onOpenDashboard={() => setActiveTab('dashboard')} onPreviewProfile={(id) => openProfile(id, 'me')} onOpenChat={() => { setActiveChatBizId(null); setActiveTab('chat'); }} />;
-      case 'chat': return <ChatView session={session} onBack={() => setActiveTab('me')} initialBizId={activeChatBizId} />;
-      case 'record': return <RecordView onCancel={() => { setActiveTab(lastTab); setLastTab('feed'); }} onPost={handleNewPost} />;
-      default: return <FeedView posts={allPosts} onProfileClick={(id) => openProfile(id, 'feed')} onRefresh={fetchData} userId={session?.user.id} />;
+      case 'feed':
+        return <FeedView posts={allPosts} onSelectBusiness={(biz) => { setSelectedBusiness(biz); setLastTab('feed'); setActiveTab('profile'); }} />;
+      case 'discovery':
+        return <DiscoveryView onSelectBusiness={(biz) => { setSelectedBusiness(biz); setLastTab('discovery'); setActiveTab('profile'); }} />;
+      case 'following':
+        return <FollowingView session={session} onSelectBusiness={(biz) => { setSelectedBusiness(biz); setLastTab('following'); setActiveTab('profile'); }} />;
+      case 'me':
+        return (
+          <MeView
+            session={session}
+            business={userBusiness}
+            userPosts={allPosts.filter(p => p.business_id === userBusiness?.id)}
+            onUpdateBusiness={handleUpdateBusiness}
+            theme={theme}
+            onToggleTheme={setTheme}
+            onOpenDashboard={() => setActiveTab('dashboard')}
+            onOpenChat={() => {
+              setActiveChatBizId(null);
+              setActiveTab('chat');
+            }}
+            onPreviewProfile={(id) => {
+              const biz = allPosts.find(p => p.business_id === id)?.business;
+              if (biz) {
+                setSelectedBusiness(biz as any);
+                setLastTab('me');
+                setActiveTab('profile');
+              }
+            }}
+            hasUnreadMessages={showMessagesBadge}
+            onMessagesButtonClick={() => {
+              localStorage.setItem('notif_messages_viewed', new Date().toISOString());
+              setShowMessagesBadge(false);
+            }}
+          />
+        );
+      case 'profile':
+        return <ProfileView business={selectedBusiness} onBack={() => setActiveTab(lastTab)} onOpenChat={(bizId) => { setActiveChatBizId(bizId); setActiveTab('chat'); }} />;
+      case 'dashboard':
+        return <DashboardView session={session} business={userBusiness} onBack={() => setActiveTab('me')} />;
+      case 'chat':
+        return <ChatView session={session} onBack={() => setActiveTab('me')} initialBizId={activeChatBizId} />;
+      case 'record':
+        return (
+          <RecordView
+            onBack={() => setActiveTab(lastTab)}
+            onPublish={async (blob, type, caption, onProgress, thumb) => {
+              if (!session) {
+                setActiveTab('me');
+                return;
+              }
+              await handleNewPost(blob, type, caption, onProgress, thumb);
+            }}
+          />
+        );
     }
-  };
 
-  if (loading) return <div className="h-[100dvh] flex items-center justify-center bg-black text-blue-500 font-black tracking-[0.5em] animate-pulse">MAX COMPANY</div>;
-
-  if (activeTab === 'record') {
     return (
-      <div className={`mobile-frame bg-black ${theme === 'dark' ? 'dark' : ''}`}>
-        <RecordView
-          onCancel={() => {
-            setActiveTab(lastTab);
-            setLastTab('feed');
-          }}
-          onPost={async (blob, type, caption, onProgress, thumb) => {
-            if (!session) {
-              alert("Você precisa estar logado para publicar!");
-              setActiveTab('me');
-              return;
-            }
-            if (!userBusiness) {
-              alert("Crie um perfil profissional primeiro!");
-              setActiveTab('me');
-              return;
-            }
-            await handleNewPost(blob, type, caption, onProgress, thumb);
-          }}
-        />
+      <div className="flex-1 flex items-center justify-center bg-white dark:bg-black">
+        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Carregando...</p>
       </div>
     );
   }
@@ -306,8 +321,18 @@ const App: React.FC = () => {
           <NavButton active={activeTab === 'following'} icon={<Users size={22} />} label="Seguindo" onClick={() => setActiveTab('following')} theme={theme} />
         </div>
         <div className="flex justify-center items-center w-full relative">
-          <NavButton active={activeTab === 'me'} icon={session ? <User size={22} /> : <LogIn size={22} />} label="Perfil" onClick={() => setActiveTab('me')} theme={theme} />
-          {session && totalUnreadMessages > 0 && (
+          <NavButton
+            active={activeTab === 'me'}
+            icon={session ? <User size={22} /> : <LogIn size={22} />}
+            label="Perfil"
+            onClick={() => {
+              localStorage.setItem('notif_profile_viewed', new Date().toISOString());
+              setShowProfileBadge(false);
+              setActiveTab('me');
+            }}
+            theme={theme}
+          />
+          {session && showProfileBadge && (
             <div className="absolute top-1 right-3 w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
           )}
         </div>

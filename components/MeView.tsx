@@ -42,6 +42,8 @@ interface MeViewProps {
   onOpenDashboard: () => void;
   onOpenChat: () => void;
   onPreviewProfile?: (id: string) => void;
+  hasUnreadMessages?: boolean;
+  onMessagesButtonClick?: () => void;
 }
 
 const DAYS_OF_WEEK = [
@@ -54,7 +56,7 @@ const DAYS_OF_WEEK = [
   { id: 'Sab', label: 'S' },
 ];
 
-const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, userPosts, onUpdateBusiness, theme, onToggleTheme, onOpenDashboard, onOpenChat, onPreviewProfile }) => {
+const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, userPosts, onUpdateBusiness, theme, onToggleTheme, onOpenDashboard, onOpenChat, onPreviewProfile, hasUnreadMessages, onMessagesButtonClick }) => {
   const [activeView, setActiveView] = useState<'main' | 'edit-profile' | 'manage-posts' | 'edit-post'>('main');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingPost, setEditingPost] = useState<MediaPost | null>(null);
@@ -482,17 +484,20 @@ const MeView: React.FC<MeViewProps> = ({ session, business: initialBusiness, use
 
                 <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
                   <button
-                    onClick={onOpenChat}
-                    className="w-full flex items-center justify-between p-6 bg-blue-600 text-white rounded-[2.4rem] shadow-xl shadow-blue-500/10 active:scale-[0.98] transition-all group"
+                    onClick={() => {
+                      onMessagesButtonClick?.();
+                      onOpenChat();
+                    }}
+                    className="w-full flex items-center justify-between p-6 bg-blue-600 text-white rounded-[2.4rem] shadow-xl shadow-blue-500/10 active:scale-[0.98] transition-all group relative"
                   >
+                    {hasUnreadMessages && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
+                    )}
                     <div className="flex items-center gap-4">
                       <MessageCircle size={22} />
                       <span className="text-[11px] font-black uppercase tracking-widest">Suas Mensagens</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                      <ChevronRight size={18} />
-                    </div>
+                    <ChevronRight size={18} />
                   </button>
                   <p className="mt-4 text-[8px] text-zinc-500 font-bold text-center uppercase tracking-widest leading-relaxed">
                     Gerencie solicitações e conversas com clientes e profissionais.
