@@ -184,40 +184,50 @@ const ChatView: React.FC<ChatViewProps> = ({ session, onBack, initialBizId }) =>
     useEffect(() => {
         resolveChat();
 
-        // Canal de escuta global para o usuário logado
+        // Canal de escuta simplificado e robusto
         const channel = supabase
-            .channel(`chat_sync_${session.user.id}`)
+            .channel(`universal_chat_${session.user.id}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'messages',
-                filter: activeConvId ? `conversation_id=eq.${activeConvId}` : undefined
-            }, async (payload) => {
-                console.log("Sincronia: Nova atualização no chat", payload.eventType);
-                if (activeConvId) {
-                    await fetchMessages(activeConvId);
-                } else {
-                    await fetchConversations();
+                table: 'messages'
+            }, (payload: any) => {
+                console.log("Realtime: Alteração detectada em Mensagens", payload);
+
+                // Se o chat ativo está aberto, atualiza mensagens
+                if (activeConvId &&
+                    (payload.new.conversation_id === activeConvId ||
+                        payload.old?.conversation_id === activeConvId)) {
+                    fetchMessages(activeConvId);
                 }
+
+                // Sempre atualiza a lista de conversas para o "last_message"
+                fetchConversations();
             })
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'conversations'
-            }, () => {
+            }, (payload: any) => {
+                console.log("Realtime: Alteração detectada em Conversas", payload);
                 fetchConversations();
             })
-            .subscribe();
+            .subscribe((status) => {
+                console.log("CONEXÃO REALTIME STATUS:", status);
+                if (status === 'SUBSCRIBED') {
+                    console.log("Chat: Sincronização viva e pronta.");
+                }
+            });
 
-        // Fallback: Varredura a cada 15 segundos
-        const fallback = setInterval(() => {
+        // Fallback redundante para garantir que nada passe
+        const pulse = setInterval(() => {
             if (activeConvId) fetchMessages(activeConvId);
             fetchConversations();
-        }, 15000);
+        }, 10000);
 
         return () => {
             supabase.removeChannel(channel);
-            clearInterval(fallback);
+            clearInterval(pulse);
         };
     }, [initialBizId, activeConvId, session?.user?.id]);
 
